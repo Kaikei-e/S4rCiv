@@ -1,0 +1,46 @@
+// Table-driven unit test for {{ModuleName}} (e.g. a source adapter / normalizer).
+// Place inside the module file as `#[cfg(test)] mod tests`, or under `tests/`.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Case {
+        name: &'static str,
+        input: {{InputType}},
+        want: Result<{{OutputType}}, {{ErrorType}}>,
+    }
+
+    #[test]
+    fn {{function_name}}_table() {
+        let cases = vec![
+            Case {
+                name: "success case",
+                // input: ...,
+                // want: Ok(...),
+                input: todo!(),
+                want: todo!(),
+            },
+            Case {
+                name: "error case",
+                // input: ...,
+                // want: Err(...),
+                input: todo!(),
+                want: todo!(),
+            },
+        ];
+
+        for c in cases {
+            // let got = {{function_name}}(c.input);
+            // assert_eq!(got, c.want, "case: {}", c.name);
+            let _ = &c.name;
+        }
+    }
+
+    // async variant (tokio): collectors / IO-bound normalizers
+    #[tokio::test]
+    async fn {{function_name}}_async() {
+        // let got = {{function_name}}_async(/* ... */).await;
+        // assert!(got.is_ok());
+    }
+}
