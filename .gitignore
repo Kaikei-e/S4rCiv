@@ -1,0 +1,20 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Go build artifacts
+/services/api/api
+
+# Rust build artifacts
+**/target/
+
+# Node / SvelteKit (web/ also has its own .gitignore)
+**/node_modules/
+/web/.svelte-kit/
+/web/build/
+/web/.vite/
+
+# OS / editor
+.DS_Store
+*.log
