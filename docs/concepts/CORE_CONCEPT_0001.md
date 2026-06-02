@@ -206,28 +206,28 @@ S4rCiv は次の2つを同時に満たす：
 
 ```jsonc
 {
-  "event_id":            "uuidv7",
-  "stream_id":           "source-resource-uri",   // 監視単位（例: ある法令/会議録/契約）
-  "seq":                 1234,                      // stream内連番
-  "type":                "ResourceChanged",        // 後述
-  "source":              "ndl-kokkai",             // アダプタ識別
+  "event_id":            "uuidv7",                          // 外部識別子
+  "seq":                 1234,                               // ★global 単調増加（台帳順序・DB採番）
+  "stream_id":           "kokkai:121815254X00120240115",    // 監視単位 = 安定 Resource
+  "stream_seq":          12,                                 // stream 内連番
+  "type":                "ResourceChanged",                  // 後述
+  "source":              "ndl-kokkai",                       // アダプタ識別
   "fetcher_version":     "S4rCiv-collect/0.1.0",
-  "observed_at":         "2026-06-02T09:00:00Z",   // 取得時刻
-  "source_published_at": "2026-05-30T00:00:00Z",   // ソース主張の公開/更新時刻
-  "content_hash":        "sha256:…",               // 取得コンテンツのハッシュ
-  "prev_content_hash":   "sha256:…",               // 直前スナップショットのハッシュ
-  "archive_ref":         "ia://web/2026…/…",       // IAスナップショット(任意)
-  "log_prev_hash":       "sha256:…",               // ★ログのハッシュ連鎖
-  "payload_ref":         "blob://…",               // 生スナップショット本体への参照
-  "diff":                { /* §9.3 */ },
-  "confidence":          "high|medium|low"          // OCR系は低
+  "observed_at":         "2026-06-02T09:00:00Z",             // 取得時刻（hash 対象）
+  "source_published_at": "2026-05-30T00:00:00Z",             // ソース主張の公開/更新時刻（hash 対象）
+  "content_hash":        "sha256:…",                         // 取得コンテンツのハッシュ（= snapshot 参照）
+  "prev_content_hash":   "sha256:…",                         // ★stream 別 content 連鎖
+  "log_prev_hash":       "sha256:…",                         // ★global log 連鎖の直前 log_hash
+  "log_hash":            "sha256:…"                          // ★この行の log_hash（app 計算）
 }
 ```
+
+> **観測面の最小性（§4-4 原則を §9.1 案に優先）**: 本エンベロープは「機械的事実 ＋ ハッシュ連鎖」のみを持つ。初稿にあった `diff` / `confidence` は**解釈面へ移した** — raw/構造 diff も administrative/substantive 分類も2スナップショットからの recomputable な派生物であり、不変ログに焼くと reproject 不能になるため（DISCIPLINE §3 に整合）。`confidence` は2つに割れる: 抽出品質（OCR か否か = 取得時の機械的事実）は snapshot 側 `was_ocr`、分類 confidence は解釈面 `change` が持つ。生バイトは content-addressed な snapshot（`content_hash` PK、自前 `bytes` か `external_ref`）として保持し、event は `content_hash` で参照する。`log_prev_hash`/`log_hash` は全 stream を貫く global 単一鎖、`prev_content_hash` は stream 別鎖。実体スキーマは `db/migrations/2026060300000{1,2,3}_*.sql`、用語は `CONTEXT.md`、決定の根拠は ADR-000001 / ADR-000002。
 
 **イベント型（観測面）**
 
 - `ResourceObserved` — 初観測
-- `ResourceChanged` — ハッシュ差分（diff と classification を伴う）
+- `ResourceChanged` — ハッシュ差分（diff と classification は解釈面で算出）
 - `ResourceVanished` — 在ったものが消えた（404/削除。**沈黙も記録**）
 - `ResourceRestored` — 復活
 

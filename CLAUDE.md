@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-**Concept stage (v0). There is no code yet** — only `LICENSE`, a one-line `README.md`, the concept doc, and `DISCIPLINE.md`. There are no build, lint, or test commands because nothing is implemented. Do not invent them; add the real commands here when scaffolding begins.
+**Early scaffold (v0).** No feature code yet, but the stack skeleton exists: a Docker Compose stack (`compose.yaml`, project `s4rciv`) with Postgres 18 (`db`), Atlas migrations (`migrate`), a Go API stub (`services/api`), a Rust differ stub (`services/differ`), and a SvelteKit web stub (`web`). The **immutable data model schema is designed and migrated** — three schemas: `observation` (immutable, append-only, hash-chained ground truth), `interpretation` (two-tier: append-only `interpretation.event` + disposable read models), `control` (mutable operational state). See `db/migrations/`, `CONTEXT.md` (glossary), and `docs/ADR/000001`–`000002`. There are still no app build/lint/test commands wired beyond the stubs; add real ones here as they land. Local stack ops live in the `docker-compose` skill.
 
 ## What S4rCiv is
 
