@@ -1,0 +1,12 @@
+[package]
+name = "differ"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[[bin]]
+name = "differ"
+path = "src/main.rs"
+
+[profile.release]
+strip = true
