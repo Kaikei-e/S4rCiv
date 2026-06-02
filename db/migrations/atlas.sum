@@ -1,2 +1,5 @@
-h1:WSdubDQOBo9dIvI9wm0+C7u7IhOxAuypsS49U70oRTI=
+h1:FSwi9vhYXLKQIxzvjNmRuENO8n3vS14QtKfBTeA2nHs=
 20260602000000_init.sql h1:yqgIHQzAlQ2poB6u5BBahFLlZZLLQ3rIjUG3xnNJ7PU=
+20260603000001_observation_plane.sql h1:DnlLhY2F1nwyCMkZUFYHkaKX3vwbfJ3izJvSqN3QRQs=
+20260603000002_interpretation_plane.sql h1:vGAb1vXzwCNkn1Hv9vqJw3fJj9Ah5RaMM0Dtaqu7lzY=
+20260603000003_control_plane.sql h1:rSta2C+UCczTNse0q39oyipj4tzNLqoGdZisQ58g1JQ=
