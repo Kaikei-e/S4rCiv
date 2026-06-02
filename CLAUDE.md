@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Concept stage (v0). There is no code yet** — only `LICENSE`, a one-line `README.md`, the concept doc, and `DISCIPLINE.md`. There are no build, lint, or test commands because nothing is implemented. Do not invent them; add the real commands here when scaffolding begins.
 
-## What s4rCiv is
+## What S4rCiv is
 
 A **passive, read-only "flight recorder" for public records** plus a situation-room dashboard for citizens. It continuously collects Japanese public primary-source data (legislation, laws/ordinances, public money, procurement) and records *changes* — including deletions — into an immutable, hash-chained log, so anyone can trace **when / what / how something changed or was removed**. Non-partisan civic-tech infrastructure in the g0v / Audrey Tang lineage; a modern successor to EDGI Web Monitoring.
 
@@ -24,7 +24,7 @@ These are constraints, not aspirations. Any feature or dependency that violates 
 
 1. **Passive / read-only** — public-endpoint HTTP GET only. No auth, no submissions, no writes, no automated actions. A *sentinel*, never an actor.
 2. **Public primary sources only.**
-3. **Append-only, hash-chained log** — keep everything (incl. deletions/reversions); the log is tamper-evident so s4rCiv can prove it has not rewritten history.
+3. **Append-only, hash-chained log** — keep everything (incl. deletions/reversions); the log is tamper-evident so S4rCiv can prove it has not rewritten history.
 4. **Dual-plane separation** — *observation plane* (raw snapshots + hash-chained events; immutable ground truth) vs *interpretation plane* (normalized entities + classification + LLM summaries; recomputable projections carrying provenance + confidence).
 5. **Standards-based, no silos** — Akoma Ntoso (laws/proceedings), Popolo (people/roles), OCDS (procurement).
 6. **AI summarizes only, never judges** — no scoring/opinions in the data layer; every summary links back to source text/diff with confidence + provenance.
@@ -64,6 +64,25 @@ Later: 官報/告示 base registry (≈2026), 政治資金 (online publication m
 ## Open questions affecting implementation (concept §14)
 
 Deliberately unresolved — confirm with the user before baking in: hosting model; self-mirroring vs Internet-Archive-linking of primary documents; administrative/substantive classification heuristics and thresholds; low-confidence OCR handling in the UI; private-donor display granularity; alert delivery boundaries.
+
+## Available skills (Claude Code)
+
+Project skills live in `.claude/skills/` and are auto-discovered (no registration). Transferred from the sibling Alt project and adapted to S4rCiv. Reference docs for the `bp-*` skills live in `docs/best_practices/`.
+
+| Skill | Purpose | Fires on |
+|---|---|---|
+| `bp-rust` / `bp-go` / `bp-python` / `bp-svelte` / `bp-typescript` | Language best practices (DECREE) | editing `.rs` / `.go` / `.py` / `.svelte` / `.ts` files |
+| `clean-architecture` | Handler→Usecase→Port→Gateway→Driver layers, mapped to the adapter model + plane separation | layered backend work |
+| `immutable-design-guard` | Audits append-only event log, hash-chain integrity, reproject-safe projectors, disposable read models | migrations / projectors / event handlers; "イミュータブル", "event sourcing", "reproject" |
+| `security-auditor` | OWASP Top 10:2025 / ASVS 5.0 security review + S4rCiv collector compliance (SSRF / rate-limit / robots.txt / read-only) | "セキュリティレビュー", "脆弱性チェック", "OWASP" |
+| `web-researcher` | Official-docs-first web research → structured report | "調べて", "リサーチして", "公式ドキュメント確認して" |
+| `tdd-workflow` | Outside-in TDD (E2E → CDC → unit RED-GREEN-REFACTOR) + local CI parity | "TDDで", feature/bugfix work |
+| `s4rciv-adr-writer` | ADR authoring in Japanese (no deploy); template at `docs/ADR/template.md` | "ADR書いて", "ADRにまとめて", "ADRに記録して" |
+| `docker-compose` | Local stack command reference (db / migrate(Atlas) / api(Go) / differ(Rust) / web(SvelteKit)) | running / inspecting containers, applying migrations |
+
+`postmortem-writer` is available globally (user scope) — fires on "ポストモーテム書いて" / "incident report" / "RCA". `log-seeker` and `plan-context-loader` were intentionally **not** transferred (they need running infra / an ADR corpus that does not exist yet).
+
+Python type checking uses **Pyrefly**, not mypy.
 
 ## License
 
