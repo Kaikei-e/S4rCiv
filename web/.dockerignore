@@ -1,0 +1,9 @@
+node_modules
+build
+.svelte-kit
+.vite
+.git
+.vscode
+README.md
+Dockerfile
+.dockerignore
