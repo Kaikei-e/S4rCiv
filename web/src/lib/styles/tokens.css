@@ -1,0 +1,135 @@
+/* Design tokens — see docs/design/DESIGN_LANGUAGE.md (dark default, WCAG 2.2 AA).
+   Role-named CSS custom properties; theme swap flips the whole UI at once. */
+
+:root,
+[data-theme='dark'] {
+	/* surfaces */
+	--canvas: #0b0e13;
+	--surface-1: #11161e;
+	--surface-2: #18202a;
+	--surface-3: #212b37;
+	--hairline: rgba(174, 196, 224, 0.1);
+	--hairline-2: rgba(174, 196, 224, 0.18);
+
+	/* text */
+	--text-1: #e7ecf3;
+	--text-2: #aeb9c9;
+	--text-3: #8793a6;
+
+	/* interactive */
+	--accent: #59c7e6;
+	--accent-weak: rgba(89, 199, 230, 0.14);
+	--focus: #8ad8f2;
+
+	/* status: graphic (fill/border) / text (on dark surface) */
+	--st-nominal: #45b08a;
+	--st-nominal-t: #6fd3ac;
+	--st-info: #5a9fe0;
+	--st-info-t: #88bcf2;
+	--st-changed: #e0a845;
+	--st-changed-t: #f2c877;
+	--st-caution: #e08646;
+	--st-caution-t: #f2a974;
+	--st-critical: #d86460;
+	--st-critical-t: #f2908c;
+
+	/* data-viz (Okabe-Ito, dark-tuned; pair with shape) */
+	--dv-1: #5aa9e6;
+	--dv-2: #e0a845;
+	--dv-3: #46c29a;
+	--dv-4: #c98bdb;
+	--dv-5: #e2796a;
+	--dv-6: #9ad15b;
+
+	/* shape */
+	--r-sm: 4px;
+	--r: 7px;
+	--r-lg: 11px;
+
+	/* type */
+	--font-sans: 'IBM Plex Sans JP', 'IBM Plex Sans', system-ui, sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+[data-theme='light'] {
+	--canvas: #eef1f5;
+	--surface-1: #ffffff;
+	--surface-2: #ffffff;
+	--surface-3: #ffffff;
+	--hairline: rgba(16, 24, 33, 0.12);
+	--hairline-2: rgba(16, 24, 33, 0.2);
+	--text-1: #16202c;
+	--text-2: #465468;
+	--text-3: #5c6b7e;
+	--accent: #0c7fa3;
+	--accent-weak: rgba(12, 127, 163, 0.1);
+	--focus: #0c7fa3;
+	--st-nominal: #1e8e68;
+	--st-nominal-t: #157054;
+	--st-info: #1f6fbf;
+	--st-info-t: #175499;
+	--st-changed: #b7791f;
+	--st-changed-t: #8a5a12;
+	--st-caution: #b45f1e;
+	--st-caution-t: #8a4715;
+	--st-critical: #c0413d;
+	--st-critical-t: #993230;
+	--dv-1: #1f6fbf;
+	--dv-2: #b7791f;
+	--dv-3: #138468;
+	--dv-4: #8a4fb0;
+	--dv-5: #c0413d;
+	--dv-6: #4e8a1e;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	color-scheme: dark;
+}
+
+body {
+	margin: 0;
+	background: var(--canvas);
+	color: var(--text-1);
+	font-family: var(--font-sans);
+	font-size: 15px;
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: var(--accent);
+	text-underline-offset: 2px;
+}
+
+/* Numbers/IDs/hashes/timestamps are tabular monospace (DESIGN_LANGUAGE §4). */
+.mono {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Labels: mono, uppercase, wide tracking. */
+.label {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-3);
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation: none !important;
+		transition: none !important;
+	}
+}

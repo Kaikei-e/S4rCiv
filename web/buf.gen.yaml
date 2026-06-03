@@ -1,0 +1,23 @@
+# TypeScript Connect client generation for the web app (D2).
+#
+# Kept separate from services/api/buf.gen.yaml so the Go workflow stays clean.
+# Run from this directory against the api proto module, e.g.:
+#
+#   cd web
+#   buf generate ../services/api/proto --template buf.gen.yaml
+#
+# Remote plugins (install-free, needs buf.build network). If offline, install the
+# local devDeps instead — @bufbuild/protoc-gen-es and @connectrpc/protoc-gen-connect-es
+# — and swap `remote:` for `local:`. Outputs into src/lib/gen; the runtime deps are
+# @bufbuild/protobuf, @connectrpc/connect and @connectrpc/connect-node (server transport).
+version: v2
+clean: true
+plugins:
+  - remote: buf.build/bufbuild/es:v1.10.0
+    out: src/lib/gen
+    opt:
+      - target=ts
+  - remote: buf.build/connectrpc/es:v1.6.1
+    out: src/lib/gen
+    opt:
+      - target=ts

@@ -18,3 +18,4 @@
 # OS / editor
 .DS_Store
 *.log
+web/.pnpm-store/
