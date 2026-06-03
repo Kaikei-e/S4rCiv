@@ -64,8 +64,9 @@ message VoteEvent {
   string confidence = 8; // overall extraction confidence
   bool needs_review = 9; // queued for human review (interpretation.event verdict)
   string extractor_version = 10;
-  repeated Vote votes = 11;
-  Attribution attribution = 12;
+  string source_speech_id = 11; // the speech this vote was parsed from (provenance)
+  repeated Vote votes = 12;
+  Attribution attribution = 13;
 }
 
 message GetMeetingRequest {

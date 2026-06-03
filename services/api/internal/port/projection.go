@@ -52,6 +52,7 @@ type StoredVoteEvent struct {
 	Confidence       string
 	NeedsReview      bool
 	ExtractorVersion string
+	SourceSpeechID   string // the speech this vote was parsed from (provenance)
 	Votes            []StoredVote
 }
 

@@ -195,11 +195,12 @@ func replaceVotes(ctx context.Context, tx pgx.Tx, b port.ProjectionBatch) error 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO interpretation.vote_event
 				(vote_event_id, issue_id, motion, yes_count, no_count, abstain_count,
-				 result, confidence, needs_review, extractor_version, observation_seq, observed_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+				 result, confidence, needs_review, extractor_version, source_speech_id,
+				 observation_seq, observed_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 			ve.VoteEventID, ve.IssueID, nullStr(ve.Motion), ve.YesCount, ve.NoCount,
 			ve.AbstainCount, ve.Result, ve.Confidence, ve.NeedsReview,
-			ve.ExtractorVersion, b.ObservationSeq, b.ObservedAt,
+			ve.ExtractorVersion, nullStr(ve.SourceSpeechID), b.ObservationSeq, b.ObservedAt,
 		); err != nil {
 			return err
 		}

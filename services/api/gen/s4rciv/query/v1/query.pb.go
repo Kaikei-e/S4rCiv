@@ -378,8 +378,9 @@ type VoteEvent struct {
 	Confidence       string                 `protobuf:"bytes,8,opt,name=confidence,proto3" json:"confidence,omitempty"`                       // overall extraction confidence
 	NeedsReview      bool                   `protobuf:"varint,9,opt,name=needs_review,json=needsReview,proto3" json:"needs_review,omitempty"` // queued for human review (interpretation.event verdict)
 	ExtractorVersion string                 `protobuf:"bytes,10,opt,name=extractor_version,json=extractorVersion,proto3" json:"extractor_version,omitempty"`
-	Votes            []*Vote                `protobuf:"bytes,11,rep,name=votes,proto3" json:"votes,omitempty"`
-	Attribution      *Attribution           `protobuf:"bytes,12,opt,name=attribution,proto3" json:"attribution,omitempty"`
+	SourceSpeechId   string                 `protobuf:"bytes,11,opt,name=source_speech_id,json=sourceSpeechId,proto3" json:"source_speech_id,omitempty"` // the speech this vote was parsed from (provenance)
+	Votes            []*Vote                `protobuf:"bytes,12,rep,name=votes,proto3" json:"votes,omitempty"`
+	Attribution      *Attribution           `protobuf:"bytes,13,opt,name=attribution,proto3" json:"attribution,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -480,6 +481,13 @@ func (x *VoteEvent) GetNeedsReview() bool {
 func (x *VoteEvent) GetExtractorVersion() string {
 	if x != nil {
 		return x.ExtractorVersion
+	}
+	return ""
+}
+
+func (x *VoteEvent) GetSourceSpeechId() string {
+	if x != nil {
+		return x.SourceSpeechId
 	}
 	return ""
 }
@@ -839,7 +847,7 @@ const file_s4rciv_query_v1_query_proto_rawDesc = "" +
 	"\tperson_id\x18\x03 \x01(\tR\bpersonId\x12\x1e\n" +
 	"\n" +
 	"confidence\x18\x04 \x01(\tR\n" +
-	"confidence\"\xb4\x03\n" +
+	"confidence\"\xde\x03\n" +
 	"\tVoteEvent\x12\"\n" +
 	"\rvote_event_id\x18\x01 \x01(\tR\vvoteEventId\x12\x19\n" +
 	"\bissue_id\x18\x02 \x01(\tR\aissueId\x12\x16\n" +
@@ -853,9 +861,10 @@ const file_s4rciv_query_v1_query_proto_rawDesc = "" +
 	"confidence\x12!\n" +
 	"\fneeds_review\x18\t \x01(\bR\vneedsReview\x12+\n" +
 	"\x11extractor_version\x18\n" +
-	" \x01(\tR\x10extractorVersion\x12+\n" +
-	"\x05votes\x18\v \x03(\v2\x15.s4rciv.query.v1.VoteR\x05votes\x12>\n" +
-	"\vattribution\x18\f \x01(\v2\x1c.s4rciv.query.v1.AttributionR\vattribution\".\n" +
+	" \x01(\tR\x10extractorVersion\x12(\n" +
+	"\x10source_speech_id\x18\v \x01(\tR\x0esourceSpeechId\x12+\n" +
+	"\x05votes\x18\f \x03(\v2\x15.s4rciv.query.v1.VoteR\x05votes\x12>\n" +
+	"\vattribution\x18\r \x01(\v2\x1c.s4rciv.query.v1.AttributionR\vattribution\".\n" +
 	"\x11GetMeetingRequest\x12\x19\n" +
 	"\bissue_id\x18\x01 \x01(\tR\aissueId\"}\n" +
 	"\x12GetMeetingResponse\x122\n" +

@@ -115,6 +115,7 @@ func toVoteEvent(v port.VoteEventView) *queryv1.VoteEvent {
 		Confidence:       v.Event.Confidence,
 		NeedsReview:      v.Event.NeedsReview,
 		ExtractorVersion: v.Event.ExtractorVersion,
+		SourceSpeechId:   v.Event.SourceSpeechID,
 		Attribution:      toAttribution(v.Attr),
 	}
 	for _, vt := range v.Event.Votes {

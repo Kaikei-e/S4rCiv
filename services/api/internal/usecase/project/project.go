@@ -120,6 +120,7 @@ func buildVoteEvents(content leg.MeetingContent, ent leg.Entities) []port.Stored
 			Confidence:       pe.Confidence,
 			NeedsReview:      pe.NeedsReview,
 			ExtractorVersion: leg.ExtractorVersion,
+			SourceSpeechID:   pe.SourceSpeechID,
 			Votes:            votes,
 		})
 	}

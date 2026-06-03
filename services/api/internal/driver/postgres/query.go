@@ -129,21 +129,21 @@ func (q *QueryReader) ListMeetings(ctx context.Context, session int, house strin
 
 func (q *QueryReader) VoteEvent(ctx context.Context, voteEventID string) (port.VoteEventView, bool, error) {
 	var v port.VoteEventView
-	var motion *string
+	var motion, sourceSpeechID *string
 	var observedAt time.Time
 	var seq int64
 	var streamID, permalink string
 	err := q.pool.QueryRow(ctx, `
 		SELECT ve.vote_event_id, ve.issue_id, ve.motion, COALESCE(ve.yes_count,0),
 		       COALESCE(ve.no_count,0), COALESCE(ve.abstain_count,0), ve.result,
-		       ve.confidence, ve.needs_review, ve.extractor_version,
+		       ve.confidence, ve.needs_review, ve.extractor_version, ve.source_speech_id,
 		       ve.observation_seq, ve.observed_at, COALESCE(m.permalink,''), m.stream_id
 		FROM interpretation.vote_event ve
 		JOIN interpretation.meeting m ON m.issue_id = ve.issue_id
 		WHERE ve.vote_event_id = $1`, voteEventID,
 	).Scan(&v.Event.VoteEventID, &v.Event.IssueID, &motion, &v.Event.YesCount,
 		&v.Event.NoCount, &v.Event.AbstainCount, &v.Event.Result, &v.Event.Confidence,
-		&v.Event.NeedsReview, &v.Event.ExtractorVersion, &seq, &observedAt, &permalink, &streamID)
+		&v.Event.NeedsReview, &v.Event.ExtractorVersion, &sourceSpeechID, &seq, &observedAt, &permalink, &streamID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return v, false, nil
 	}
@@ -152,6 +152,9 @@ func (q *QueryReader) VoteEvent(ctx context.Context, voteEventID string) (port.V
 	}
 	if motion != nil {
 		v.Event.Motion = *motion
+	}
+	if sourceSpeechID != nil {
+		v.Event.SourceSpeechID = *sourceSpeechID
 	}
 	v.Attr = port.Attribution{
 		Source: sourceOf(streamID), Permalink: permalink, FetchedAt: observedAt, ObservationSeq: seq,
