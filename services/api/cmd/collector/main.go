@@ -30,6 +30,7 @@ import (
 	"s4rciv.org/api/internal/driver/postgres"
 	"s4rciv.org/api/internal/driver/sys"
 	"s4rciv.org/api/internal/gateway/egov"
+	"s4rciv.org/api/internal/gateway/giinroster"
 	"s4rciv.org/api/internal/gateway/kokkai"
 	"s4rciv.org/api/internal/port"
 	"s4rciv.org/api/internal/usecase/collect"
@@ -53,7 +54,7 @@ type pipeline interface {
 
 func main() {
 	fs := flag.NewFlagSet("collector", flag.ExitOnError)
-	source := fs.String("source", "kokkai", "source to operate on (kokkai | egov-law)")
+	source := fs.String("source", "kokkai", "source to operate on (kokkai | egov-law | giin-roster)")
 	_ = fs.Parse(os.Args[1:])
 	rest := fs.Args()
 	if len(rest) < 1 {
@@ -109,11 +110,27 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		gw := kokkai.New(httpc)
 		collector := collect.New(
 			postgres.NewEventLog(pool), gw, control, gw, sys.Clock{}, sys.IDGen{},
-			collect.Config{FetcherVersion: collectorVersion},
+			collect.Config{FetcherVersion: collectorVersion, Source: kokkai.SourceName},
 		)
 		rm := postgres.NewReadModel(pool)
 		projector := project.New(postgres.NewEventReader(pool), gw, rm, rm, source)
 		return &kokkaiPipeline{collector: collector, projector: projector}, nil
+
+	case giinroster.SourceName:
+		// egovhttp is a generic rate-limited + robots-compliant GET client (GetAbs);
+		// reused here for the roster pages (ADR-000008). DB is Go-owned; differ N/A.
+		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
+		if err != nil {
+			return nil, err
+		}
+		gw := giinroster.New(httpc)
+		collector := collect.New(
+			postgres.NewEventLog(pool), gw, control, gw, sys.Clock{}, sys.IDGen{},
+			collect.Config{FetcherVersion: collectorVersion, Source: giinroster.SourceName},
+		)
+		rm := postgres.NewRosterReadModel(pool)
+		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, giinroster.SourceName)
+		return &giinRosterPipeline{collector: collector, projector: projector}, nil
 
 	case egov.SourceName:
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
@@ -180,6 +197,48 @@ func (k *kokkaiPipeline) discover(ctx context.Context, args []string) {
 		log.Fatal("discover requires --from and --until (YYYY-MM-DD)")
 	}
 	n, err := k.collector.Discover(ctx, port.ListScope{From: *from, Until: *until, Max: *max})
+	if err != nil {
+		log.Fatalf("discover: %v", err)
+	}
+	log.Printf("discover: upserted %d watches", n)
+}
+
+// ── giin-roster pipeline ────────────────────────────────────────────────────
+
+type giinRosterPipeline struct {
+	collector *collect.Collector
+	projector *project.RosterProjector
+}
+
+func (g *giinRosterPipeline) source() string { return giinroster.SourceName }
+
+func (g *giinRosterPipeline) cycle(ctx context.Context) {
+	emitted, err := g.collector.PollOnce(ctx, giinroster.SourceName, pollBatch)
+	if err != nil {
+		log.Printf("poll: %v", err)
+	} else {
+		log.Printf("poll: emitted %d events", emitted)
+	}
+	projected, err := g.projector.Run(ctx)
+	if err != nil {
+		log.Printf("project: %v", err)
+		return
+	}
+	log.Printf("project: %d roster pages", projected)
+}
+
+func (g *giinRosterPipeline) reproject(ctx context.Context) error {
+	n, err := g.projector.Reproject(ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("reproject: projected %d roster pages", n)
+	return nil
+}
+
+func (g *giinRosterPipeline) discover(ctx context.Context, _ []string) {
+	// The roster is a fixed page set, so discover ignores --from/--until.
+	n, err := g.collector.Discover(ctx, port.ListScope{})
 	if err != nil {
 		log.Fatalf("discover: %v", err)
 	}
@@ -275,7 +334,7 @@ func runDaemon(ctx context.Context, p pipeline) {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law] <run|poll-once|reproject|discover>
+	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law|giin-roster] <run|poll-once|reproject|discover>
 
   run         daemon: poll due watches + project on a loop
   poll-once   one poll+project cycle, then exit

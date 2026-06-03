@@ -23,11 +23,13 @@ type Collector struct {
 
 	fetcherVersion string
 	pollCadence    time.Duration // how long until a stream is polled again
+	source         string        // the source this collector discovers/upserts watches for
 }
 
 type Config struct {
 	FetcherVersion string
 	PollCadence    time.Duration
+	Source         string // source id stamped on discovered watches (default "kokkai")
 }
 
 func New(
@@ -37,10 +39,13 @@ func New(
 	if cfg.PollCadence <= 0 {
 		cfg.PollCadence = 24 * time.Hour
 	}
+	if cfg.Source == "" {
+		cfg.Source = "kokkai"
+	}
 	return &Collector{
 		log: log, fetcher: fetcher, control: control, lister: lister,
 		clock: clock, ids: ids,
-		fetcherVersion: cfg.FetcherVersion, pollCadence: cfg.PollCadence,
+		fetcherVersion: cfg.FetcherVersion, pollCadence: cfg.PollCadence, source: cfg.Source,
 	}
 }
 
@@ -126,7 +131,7 @@ func (c *Collector) Discover(ctx context.Context, scope port.ListScope) (int, er
 	}
 	for _, r := range refs {
 		if err := c.control.UpsertWatch(ctx, port.Watch{
-			StreamID: r.StreamID, Source: "kokkai",
+			StreamID: r.StreamID, Source: c.source,
 			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
 		}); err != nil {
 			return 0, fmt.Errorf("upsert watch %s: %w", r.StreamID, err)
