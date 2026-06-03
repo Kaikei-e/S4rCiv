@@ -1,14 +1,20 @@
+// Command api is the read-only query side: a Connect-RPC server over the
+// interpretation read models, plus health/readiness probes. It never writes
+// (CQRS: the collector owns the command side).
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
+
+	queryv1connect "s4rciv.org/api/gen/s4rciv/query/v1/queryv1connect"
+	"s4rciv.org/api/internal/driver/postgres"
+	"s4rciv.org/api/internal/handler/queryrpc"
 )
 
 func main() {
@@ -18,20 +24,23 @@ func main() {
 		os.Exit(probe())
 	}
 
-	// Fail fast if the DB password secret is not mounted. Never log its value.
-	if path := os.Getenv("DB_PASSWORD_FILE"); path != "" {
-		b, err := os.ReadFile(path)
-		if err != nil || len(strings.TrimSpace(string(b))) == 0 {
-			log.Fatalf("db password secret missing or empty at %s", path)
-		}
+	ctx := context.Background()
+	pool, err := postgres.Connect(ctx)
+	if err != nil {
+		log.Fatalf("connect db: %v", err)
 	}
+	defer pool.Close()
 
+	handler := queryrpc.New(postgres.NewQueryReader(pool))
 	mux := http.NewServeMux()
+	mux.Handle(queryv1connect.NewQueryServiceHandler(handler))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
-	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-		if err := dialDB(); err != nil {
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
 			http.Error(w, "db unreachable", http.StatusServiceUnavailable)
 			return
 		}
@@ -42,15 +51,6 @@ func main() {
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	log.Printf("api listening on %s", addr)
 	log.Fatal(srv.ListenAndServe())
-}
-
-func dialDB() error {
-	addr := net.JoinHostPort(envOr("POSTGRES_HOST", "db"), envOr("POSTGRES_PORT", "5432"))
-	conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
-	if err != nil {
-		return err
-	}
-	return conn.Close()
 }
 
 func probe() int {
