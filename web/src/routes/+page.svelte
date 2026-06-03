@@ -33,7 +33,7 @@
 <header class="topbar">
 	<div class="brand">
 		<span class="dot" aria-hidden="true">◉</span>
-		<h1>S4rCiv: サーシヴ <span class="label">公的記録の可視化・追跡</span></h1>
+		<h1>S4rCiv： サーシヴ <span class="label">公的記録の可視化・追跡</span></h1>
 	</div>
 	<nav class="topnav">
 		<a class="navlink" href="/votes" title="衆院の記名投票を小選挙区別に地図で見る">🗺 衆院</a>
