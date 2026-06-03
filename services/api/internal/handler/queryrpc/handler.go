@@ -126,6 +126,63 @@ func toVoteEventSummary(s port.VoteEventSummaryView) *queryv1.VoteEventSummary {
 	}
 }
 
+func (h *Handler) ListSangiinVoteEvents(ctx context.Context, req *connect.Request[queryv1.ListSangiinVoteEventsRequest]) (*connect.Response[queryv1.ListSangiinVoteEventsResponse], error) {
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := parseOffset(req.Msg.GetPageToken())
+	session, items, err := h.reader.ListSangiinVoteEvents(ctx, int(req.Msg.GetSession()), limit+1, offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.ListSangiinVoteEventsResponse{Session: int32(session)}
+	if len(items) > limit {
+		out.NextPageToken = strconv.Itoa(offset + limit)
+		items = items[:limit]
+	}
+	for _, s := range items {
+		out.VoteEvents = append(out.VoteEvents, &queryv1.SangiinVoteEventSummary{
+			VoteEventId: s.VoteEventID, Session: int32(s.Session), Motion: s.Motion,
+			Date: s.Date, YesCount: int32(s.YesCount), NoCount: int32(s.NoCount),
+			Attribution: toAttribution(s.Attr),
+		})
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Handler) GetSangiinVoteMap(ctx context.Context, req *connect.Request[queryv1.GetSangiinVoteMapRequest]) (*connect.Response[queryv1.GetSangiinVoteMapResponse], error) {
+	id := req.Msg.GetVoteEventId()
+	if id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("vote_event_id is required"))
+	}
+	v, found, err := h.reader.GetSangiinVoteMap(ctx, id)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("sangiin vote %s not found", id))
+	}
+	out := &queryv1.GetSangiinVoteMapResponse{
+		VoteEventId: v.VoteEventID, Session: int32(v.Session), Motion: v.Motion, Date: v.Date,
+		YesCount: int32(v.YesCount), NoCount: int32(v.NoCount),
+		TotalVotes: int32(v.TotalVotes), MatchedVotes: int32(v.MatchedVotes),
+		Attribution: toAttribution(v.Attr),
+	}
+	for _, p := range v.Prefectures {
+		out.Prefectures = append(out.Prefectures, &queryv1.PrefectureTally{
+			DistrictCode: p.DistrictCode, DistrictName: p.DistrictName,
+			Yes: int32(p.Yes), No: int32(p.No), Abstain: int32(p.Abstain),
+		})
+	}
+	for _, pr := range v.PrVotes {
+		out.PrVotes = append(out.PrVotes, &queryv1.SangiinPrVote{
+			VoterName: pr.VoterName, Option: pr.Option, ParliamentaryGroup: pr.Group,
+		})
+	}
+	return connect.NewResponse(out), nil
+}
+
 func (h *Handler) GetLaw(ctx context.Context, req *connect.Request[queryv1.GetLawRequest]) (*connect.Response[queryv1.GetLawResponse], error) {
 	id := req.Msg.GetLawId()
 	if id == "" {

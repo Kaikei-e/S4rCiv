@@ -128,6 +128,47 @@ type LegislatorVotes struct {
 	Votes              []LegislatorVoteView
 }
 
+// ── 参議院本会議投票結果 マップ views (ADR-000010) ────────────────────────────────
+
+type SangiinVoteEventSummaryView struct {
+	VoteEventID string
+	Session     int
+	Motion      string
+	Date        string
+	YesCount    int
+	NoCount     int
+	Attr        Attribution
+}
+
+// PrefectureTallyView is one 都道府県's 内訳 (raw counts, not a rate; ADR-000010).
+type PrefectureTallyView struct {
+	DistrictCode string
+	DistrictName string
+	Yes          int
+	No           int
+	Abstain      int
+}
+
+type SangiinPrVoteView struct {
+	VoterName string
+	Option    string
+	Group     string
+}
+
+type SangiinVoteMapView struct {
+	VoteEventID  string
+	Session      int
+	Motion       string
+	Date         string
+	YesCount     int
+	NoCount      int
+	Prefectures  []PrefectureTallyView
+	PrVotes      []SangiinPrVoteView
+	TotalVotes   int
+	MatchedVotes int
+	Attr         Attribution
+}
+
 // QueryReader is the read-only view over the interpretation read models.
 type QueryReader interface {
 	Meeting(ctx context.Context, issueID string) (MeetingView, []SpeechView, bool, error)
@@ -139,4 +180,8 @@ type QueryReader interface {
 	ListVoteEvents(ctx context.Context, f VoteEventFilter) (int, []VoteEventSummaryView, error)
 	ListTimeline(ctx context.Context, f TimelineFilter) ([]TimelineItemView, error)
 	VotesByPerson(ctx context.Context, personID string, limit, offset int) (LegislatorVotes, bool, error)
+	// 参議院 vote map (ADR-000010): list 記名投票 (session 0 = latest) and the per-都道府県
+	// 内訳 + 比例 panel + coverage for one vote.
+	ListSangiinVoteEvents(ctx context.Context, session, limit, offset int) (int, []SangiinVoteEventSummaryView, error)
+	GetSangiinVoteMap(ctx context.Context, voteEventID string) (SangiinVoteMapView, bool, error)
 }

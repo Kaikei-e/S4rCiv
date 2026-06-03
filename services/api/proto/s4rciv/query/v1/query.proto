@@ -30,6 +30,13 @@ service QueryService {
   // here (§7) — only structural change counts. Ordered by global seq desc;
   // keyset pagination over seq.
   rpc ListTimeline(ListTimelineRequest) returns (ListTimelineResponse);
+  // ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────
+  // kokkai records 衆 votes as counts only, so the district vote map sources per-member
+  // votes from the 参議院 roll-call (touhyoulist), rendered over 都道府県 selection
+  // districts (1:N — a 内訳, never a 賛同率 heatmap; §3/§5-C).
+  rpc ListSangiinVoteEvents(ListSangiinVoteEventsRequest) returns (ListSangiinVoteEventsResponse);
+  rpc GetSangiinVoteMap(GetSangiinVoteMapRequest) returns (GetSangiinVoteMapResponse);
+
   // ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
   // A legislator's named-vote history: factual records of an accountable public
   // actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
@@ -250,6 +257,63 @@ message GetLawChangesRequest {
 message GetLawChangesResponse {
   repeated LawChange changes = 1;
   string next_page_token = 2;
+}
+
+// ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────────
+
+message SangiinVoteEventSummary {
+  string vote_event_id = 1; // page slug, e.g. "221-0407-v001"
+  int32 session = 2;
+  string motion = 3; // 議案件名
+  string date = 4; // YYYY-MM-DD
+  int32 yes_count = 5; // 賛成票 (announced)
+  int32 no_count = 6; // 反対票 (announced)
+  Attribution attribution = 7;
+}
+message ListSangiinVoteEventsRequest {
+  int32 session = 1; // 0 = latest
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListSangiinVoteEventsResponse {
+  int32 session = 1;
+  repeated SangiinVoteEventSummary vote_events = 2;
+  string next_page_token = 3;
+}
+
+// One 都道府県 selection district's 内訳 (raw counts, NOT a rate). The map fills each
+// prefecture by a FACTUAL category derived from these (全員賛成 / 全員反対 / 割れ / 記録
+// なし) — never a 賛同率 heatmap (§3/§5-C). The raw counts are shown in context (§7).
+message PrefectureTally {
+  string district_code = 1; // JIS prefecture code(s); "31,32" for a 合区
+  string district_name = 2; // 東京 / 鳥取・島根
+  int32 yes = 3;
+  int32 no = 4;
+  int32 abstain = 5;
+}
+
+// One 比例 (全国区) member's vote — shown in the companion panel, never erased (§5).
+message SangiinPrVote {
+  string voter_name = 1;
+  string option = 2; // yes | no | abstain
+  string parliamentary_group = 3; // 会派
+}
+
+message GetSangiinVoteMapRequest {
+  string vote_event_id = 1;
+}
+message GetSangiinVoteMapResponse {
+  string vote_event_id = 1;
+  int32 session = 2;
+  string motion = 3;
+  string date = 4;
+  int32 yes_count = 5; // announced totals
+  int32 no_count = 6;
+  repeated PrefectureTally prefectures = 7; // choropleth data (都道府県 内訳)
+  repeated SangiinPrVote pr_votes = 8; // 比例 companion panel
+  int32 total_votes = 9; // coverage: all per-member rows
+  int32 matched_votes = 10; // rows joined to a roster member (the rest are 未集計)
+  Attribution attribution = 11;
 }
 
 // ── Cross-source timeline (ADR-000006) ───────────────────────────────────────

@@ -54,6 +54,12 @@ const (
 	// QueryServiceListTimelineProcedure is the fully-qualified name of the QueryService's ListTimeline
 	// RPC.
 	QueryServiceListTimelineProcedure = "/s4rciv.query.v1.QueryService/ListTimeline"
+	// QueryServiceListSangiinVoteEventsProcedure is the fully-qualified name of the QueryService's
+	// ListSangiinVoteEvents RPC.
+	QueryServiceListSangiinVoteEventsProcedure = "/s4rciv.query.v1.QueryService/ListSangiinVoteEvents"
+	// QueryServiceGetSangiinVoteMapProcedure is the fully-qualified name of the QueryService's
+	// GetSangiinVoteMap RPC.
+	QueryServiceGetSangiinVoteMapProcedure = "/s4rciv.query.v1.QueryService/GetSangiinVoteMap"
 	// QueryServiceListLegislatorVotesProcedure is the fully-qualified name of the QueryService's
 	// ListLegislatorVotes RPC.
 	QueryServiceListLegislatorVotesProcedure = "/s4rciv.query.v1.QueryService/ListLegislatorVotes"
@@ -61,16 +67,18 @@ const (
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	queryServiceServiceDescriptor                   = v1.File_s4rciv_query_v1_query_proto.Services().ByName("QueryService")
-	queryServiceGetMeetingMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("GetMeeting")
-	queryServiceListMeetingsMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListMeetings")
-	queryServiceGetVoteEventMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("GetVoteEvent")
-	queryServiceListVoteEventsMethodDescriptor      = queryServiceServiceDescriptor.Methods().ByName("ListVoteEvents")
-	queryServiceGetLawMethodDescriptor              = queryServiceServiceDescriptor.Methods().ByName("GetLaw")
-	queryServiceListLawsMethodDescriptor            = queryServiceServiceDescriptor.Methods().ByName("ListLaws")
-	queryServiceGetLawChangesMethodDescriptor       = queryServiceServiceDescriptor.Methods().ByName("GetLawChanges")
-	queryServiceListTimelineMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListTimeline")
-	queryServiceListLegislatorVotesMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
+	queryServiceServiceDescriptor                     = v1.File_s4rciv_query_v1_query_proto.Services().ByName("QueryService")
+	queryServiceGetMeetingMethodDescriptor            = queryServiceServiceDescriptor.Methods().ByName("GetMeeting")
+	queryServiceListMeetingsMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("ListMeetings")
+	queryServiceGetVoteEventMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("GetVoteEvent")
+	queryServiceListVoteEventsMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListVoteEvents")
+	queryServiceGetLawMethodDescriptor                = queryServiceServiceDescriptor.Methods().ByName("GetLaw")
+	queryServiceListLawsMethodDescriptor              = queryServiceServiceDescriptor.Methods().ByName("ListLaws")
+	queryServiceGetLawChangesMethodDescriptor         = queryServiceServiceDescriptor.Methods().ByName("GetLawChanges")
+	queryServiceListTimelineMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("ListTimeline")
+	queryServiceListSangiinVoteEventsMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("ListSangiinVoteEvents")
+	queryServiceGetSangiinVoteMapMethodDescriptor     = queryServiceServiceDescriptor.Methods().ByName("GetSangiinVoteMap")
+	queryServiceListLegislatorVotesMethodDescriptor   = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -95,6 +103,12 @@ type QueryServiceClient interface {
 	// here (§7) — only structural change counts. Ordered by global seq desc;
 	// keyset pagination over seq.
 	ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error)
+	// ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────
+	// kokkai records 衆 votes as counts only, so the district vote map sources per-member
+	// votes from the 参議院 roll-call (touhyoulist), rendered over 都道府県 selection
+	// districts (1:N — a 内訳, never a 賛同率 heatmap; §3/§5-C).
+	ListSangiinVoteEvents(context.Context, *connect.Request[v1.ListSangiinVoteEventsRequest]) (*connect.Response[v1.ListSangiinVoteEventsResponse], error)
+	GetSangiinVoteMap(context.Context, *connect.Request[v1.GetSangiinVoteMapRequest]) (*connect.Response[v1.GetSangiinVoteMapResponse], error)
 	// ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
 	// A legislator's named-vote history: factual records of an accountable public
 	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
@@ -160,6 +174,18 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceListTimelineMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listSangiinVoteEvents: connect.NewClient[v1.ListSangiinVoteEventsRequest, v1.ListSangiinVoteEventsResponse](
+			httpClient,
+			baseURL+QueryServiceListSangiinVoteEventsProcedure,
+			connect.WithSchema(queryServiceListSangiinVoteEventsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getSangiinVoteMap: connect.NewClient[v1.GetSangiinVoteMapRequest, v1.GetSangiinVoteMapResponse](
+			httpClient,
+			baseURL+QueryServiceGetSangiinVoteMapProcedure,
+			connect.WithSchema(queryServiceGetSangiinVoteMapMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		listLegislatorVotes: connect.NewClient[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse](
 			httpClient,
 			baseURL+QueryServiceListLegislatorVotesProcedure,
@@ -171,15 +197,17 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // queryServiceClient implements QueryServiceClient.
 type queryServiceClient struct {
-	getMeeting          *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
-	listMeetings        *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
-	getVoteEvent        *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
-	listVoteEvents      *connect.Client[v1.ListVoteEventsRequest, v1.ListVoteEventsResponse]
-	getLaw              *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
-	listLaws            *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
-	getLawChanges       *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
-	listTimeline        *connect.Client[v1.ListTimelineRequest, v1.ListTimelineResponse]
-	listLegislatorVotes *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
+	getMeeting            *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
+	listMeetings          *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
+	getVoteEvent          *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
+	listVoteEvents        *connect.Client[v1.ListVoteEventsRequest, v1.ListVoteEventsResponse]
+	getLaw                *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
+	listLaws              *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
+	getLawChanges         *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
+	listTimeline          *connect.Client[v1.ListTimelineRequest, v1.ListTimelineResponse]
+	listSangiinVoteEvents *connect.Client[v1.ListSangiinVoteEventsRequest, v1.ListSangiinVoteEventsResponse]
+	getSangiinVoteMap     *connect.Client[v1.GetSangiinVoteMapRequest, v1.GetSangiinVoteMapResponse]
+	listLegislatorVotes   *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -222,6 +250,16 @@ func (c *queryServiceClient) ListTimeline(ctx context.Context, req *connect.Requ
 	return c.listTimeline.CallUnary(ctx, req)
 }
 
+// ListSangiinVoteEvents calls s4rciv.query.v1.QueryService.ListSangiinVoteEvents.
+func (c *queryServiceClient) ListSangiinVoteEvents(ctx context.Context, req *connect.Request[v1.ListSangiinVoteEventsRequest]) (*connect.Response[v1.ListSangiinVoteEventsResponse], error) {
+	return c.listSangiinVoteEvents.CallUnary(ctx, req)
+}
+
+// GetSangiinVoteMap calls s4rciv.query.v1.QueryService.GetSangiinVoteMap.
+func (c *queryServiceClient) GetSangiinVoteMap(ctx context.Context, req *connect.Request[v1.GetSangiinVoteMapRequest]) (*connect.Response[v1.GetSangiinVoteMapResponse], error) {
+	return c.getSangiinVoteMap.CallUnary(ctx, req)
+}
+
 // ListLegislatorVotes calls s4rciv.query.v1.QueryService.ListLegislatorVotes.
 func (c *queryServiceClient) ListLegislatorVotes(ctx context.Context, req *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error) {
 	return c.listLegislatorVotes.CallUnary(ctx, req)
@@ -249,6 +287,12 @@ type QueryServiceHandler interface {
 	// here (§7) — only structural change counts. Ordered by global seq desc;
 	// keyset pagination over seq.
 	ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error)
+	// ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────
+	// kokkai records 衆 votes as counts only, so the district vote map sources per-member
+	// votes from the 参議院 roll-call (touhyoulist), rendered over 都道府県 selection
+	// districts (1:N — a 内訳, never a 賛同率 heatmap; §3/§5-C).
+	ListSangiinVoteEvents(context.Context, *connect.Request[v1.ListSangiinVoteEventsRequest]) (*connect.Response[v1.ListSangiinVoteEventsResponse], error)
+	GetSangiinVoteMap(context.Context, *connect.Request[v1.GetSangiinVoteMapRequest]) (*connect.Response[v1.GetSangiinVoteMapResponse], error)
 	// ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
 	// A legislator's named-vote history: factual records of an accountable public
 	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
@@ -310,6 +354,18 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceListTimelineMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceListSangiinVoteEventsHandler := connect.NewUnaryHandler(
+		QueryServiceListSangiinVoteEventsProcedure,
+		svc.ListSangiinVoteEvents,
+		connect.WithSchema(queryServiceListSangiinVoteEventsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	queryServiceGetSangiinVoteMapHandler := connect.NewUnaryHandler(
+		QueryServiceGetSangiinVoteMapProcedure,
+		svc.GetSangiinVoteMap,
+		connect.WithSchema(queryServiceGetSangiinVoteMapMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	queryServiceListLegislatorVotesHandler := connect.NewUnaryHandler(
 		QueryServiceListLegislatorVotesProcedure,
 		svc.ListLegislatorVotes,
@@ -334,6 +390,10 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceGetLawChangesHandler.ServeHTTP(w, r)
 		case QueryServiceListTimelineProcedure:
 			queryServiceListTimelineHandler.ServeHTTP(w, r)
+		case QueryServiceListSangiinVoteEventsProcedure:
+			queryServiceListSangiinVoteEventsHandler.ServeHTTP(w, r)
+		case QueryServiceGetSangiinVoteMapProcedure:
+			queryServiceGetSangiinVoteMapHandler.ServeHTTP(w, r)
 		case QueryServiceListLegislatorVotesProcedure:
 			queryServiceListLegislatorVotesHandler.ServeHTTP(w, r)
 		default:
@@ -375,6 +435,14 @@ func (UnimplementedQueryServiceHandler) GetLawChanges(context.Context, *connect.
 
 func (UnimplementedQueryServiceHandler) ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListTimeline is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListSangiinVoteEvents(context.Context, *connect.Request[v1.ListSangiinVoteEventsRequest]) (*connect.Response[v1.ListSangiinVoteEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListSangiinVoteEvents is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) GetSangiinVoteMap(context.Context, *connect.Request[v1.GetSangiinVoteMapRequest]) (*connect.Response[v1.GetSangiinVoteMapResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetSangiinVoteMap is not implemented"))
 }
 
 func (UnimplementedQueryServiceHandler) ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error) {
