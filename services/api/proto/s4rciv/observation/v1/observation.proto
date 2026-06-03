@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package s4rciv.observation.v1;
+
+option go_package = "s4rciv.org/api/gen/s4rciv/observation/v1;observationv1";
+
+// Observation event types (CORE_CONCEPT §9.1). The integer values are part of
+// the canonical hash input: a third-party verifier maps int -> name via this
+// schema. Never renumber.
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_RESOURCE_OBSERVED = 1;
+  EVENT_TYPE_RESOURCE_CHANGED = 2;
+  EVENT_TYPE_RESOURCE_VANISHED = 3;
+  EVENT_TYPE_RESOURCE_RESTORED = 4;
+}
+
+// HashableEvent is the canonical, scalar-only subset of an observation event
+// over which log_hash is computed: log_hash = sha256(Deterministic-marshal).
+// See ADR-000003; the canonical form is pinned by checkpoint.alg_version
+// "proto-linked-v1".
+//
+// INVARIANT (load-bearing — see immutable-design-guard): scalar fields only.
+// No map, no nested message, no `optional`, no `repeated`. Every field is
+// populated on every event (absent values use the documented empty encoding).
+// Adding a map/optional field, or relying on default-value omission, silently
+// diverges between proto implementations and breaks third-party chain
+// verification — the whole reason this schema exists (CORE_CONCEPT §13).
+message HashableEvent {
+  // uuidv7, canonical lowercase hyphenated form.
+  string event_id = 1;
+  string stream_id = 2;
+  int64 stream_seq = 3;
+  EventType type = 4;
+  string source = 5;
+  string fetcher_version = 6;
+  // RFC3339 in UTC, second precision, e.g. "2026-06-02T09:00:00Z".
+  string observed_at = 7;
+  // RFC3339 in UTC; empty string "" when the source asserts no publish time.
+  string source_published_at = 8;
+  // "sha256:" + lowercase hex; empty string "" on ResourceVanished.
+  string content_hash = 9;
+  // "sha256:" + lowercase hex of the previous snapshot in this stream;
+  // empty string "" at the first event of a stream.
+  string prev_content_hash = 10;
+  // lowercase hex (64 chars) of the previous event's log_hash; the genesis
+  // value is 64 zeros.
+  string log_prev_hash = 11;
+}

@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package s4rciv.query.v1;
+
+option go_package = "s4rciv.org/api/gen/s4rciv/query/v1;queryv1";
+
+// Read-only query surface over the interpretation-plane read models (M1).
+// Every response carries Attribution: source + fetch timestamp + the NDL
+// reference permalink (DISCIPLINE §9; ADR-000004). The web UI may render
+// full speech text (Copyright Act art. 40), but must never compile a single
+// speaker's remarks into a per-person anthology (art. 40 proviso = anti-doxxing).
+service QueryService {
+  rpc GetMeeting(GetMeetingRequest) returns (GetMeetingResponse);
+  rpc ListMeetings(ListMeetingsRequest) returns (ListMeetingsResponse);
+  rpc GetVoteEvent(GetVoteEventRequest) returns (GetVoteEventResponse);
+}
+
+// Provenance + source attribution attached to every projected record.
+message Attribution {
+  string source = 1; // "kokkai"
+  string permalink = 2; // NDL reference URL for the source record
+  string fetched_at = 3; // RFC3339 UTC, the observed_at of the backing event
+  int64 observation_seq = 4; // backing observation.event.seq (provenance)
+  bool was_ocr = 5; // low-confidence extraction flag (snapshot.was_ocr)
+}
+
+message Meeting {
+  string issue_id = 1; // 21-char NDL issueID
+  int32 session = 2; // 国会回次
+  string house = 3; // 衆議院 / 参議院 / 両院
+  string meeting_name = 4; // 会議名 (本会議 / 委員会名)
+  string issue = 5; // 号
+  string date = 6; // YYYY-MM-DD
+  Attribution attribution = 7;
+}
+
+message Speech {
+  string speech_id = 1;
+  string issue_id = 2;
+  int32 speech_order = 3;
+  string speaker = 4;
+  string speaker_group = 5; // 会派
+  string speaker_position = 6; // 役職
+  string speech = 7; // full text (art. 40 / PDL1.0)
+  string person_id = 8; // Popolo link, empty if unresolved
+  Attribution attribution = 9;
+}
+
+message Vote {
+  string option = 1; // "yes" | "no" | "abstain"
+  string voter_name = 2; // raw extracted name
+  string person_id = 3; // Popolo link, empty if unresolved
+  string confidence = 4; // "high" | "medium" | "low"
+}
+
+message VoteEvent {
+  string vote_event_id = 1;
+  string issue_id = 2;
+  string motion = 3; // 議案・件名
+  int32 yes_count = 4;
+  int32 no_count = 5;
+  int32 abstain_count = 6;
+  string result = 7; // "passed" | "rejected" | "unknown"
+  string confidence = 8; // overall extraction confidence
+  bool needs_review = 9; // queued for human review (interpretation.event verdict)
+  string extractor_version = 10;
+  repeated Vote votes = 11;
+  Attribution attribution = 12;
+}
+
+message GetMeetingRequest {
+  string issue_id = 1;
+}
+message GetMeetingResponse {
+  Meeting meeting = 1;
+  repeated Speech speeches = 2;
+}
+
+message ListMeetingsRequest {
+  int32 session = 1; // 0 = any
+  string house = 2; // "" = any
+  int32 page_size = 3;
+  string page_token = 4;
+}
+message ListMeetingsResponse {
+  repeated Meeting meetings = 1;
+  string next_page_token = 2;
+}
+
+message GetVoteEventRequest {
+  string vote_event_id = 1;
+}
+message GetVoteEventResponse {
+  VoteEvent vote_event = 1;
+}
