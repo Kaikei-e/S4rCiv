@@ -13,6 +13,11 @@ service QueryService {
   rpc GetMeeting(GetMeetingRequest) returns (GetMeetingResponse);
   rpc ListMeetings(ListMeetingsRequest) returns (ListMeetingsResponse);
   rpc GetVoteEvent(GetVoteEventRequest) returns (GetVoteEventResponse);
+  // e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
+  // so full text is served freely with attribution (ADR-000005, source seed comment).
+  rpc GetLaw(GetLawRequest) returns (GetLawResponse);
+  rpc ListLaws(ListLawsRequest) returns (ListLawsResponse);
+  rpc GetLawChanges(GetLawChangesRequest) returns (GetLawChangesResponse);
 }
 
 // Provenance + source attribution attached to every projected record.
@@ -93,4 +98,83 @@ message GetVoteEventRequest {
 }
 message GetVoteEventResponse {
   VoteEvent vote_event = 1;
+}
+
+// ── e-Gov 法令 (egov-law) ───────────────────────────────────────────────────────
+
+// LegislativeWork (Akoma Ntoso aligned) — law-level metadata. The 現行 (in-force)
+// tree is returned as nodes; how the text changed over time is GetLawChanges.
+message Law {
+  string law_id = 1; // e-Gov 法令ID (e.g. 415AC0000000057)
+  string law_num = 2; // 法令番号
+  string law_type = 3; // Act / CabinetOrder / ...
+  string law_title = 4;
+  string law_title_kana = 5;
+  string category = 6; // e-Gov 分類
+  string promulgation_date = 7; // YYYY-MM-DD
+  string current_revision_id = 8; // observed law_revision_id
+  string amendment_enforcement_date = 9; // 施行日 of the current revision
+  string current_revision_status = 10; // CurrentEnforced / ...
+  string repeal_status = 11; // None / Repeal / ...
+  string repeal_date = 12;
+  Attribution attribution = 13;
+}
+
+// A normalized AKN structure node (条/項/号), current tree only.
+message LawNode {
+  string eid = 1; // AKN element id (stable within the law)
+  string parent_eid = 2;
+  string node_type = 3; // article | paragraph | item | suppl_provision
+  string num = 4;
+  string caption = 5; // 見出し
+  string chapter_num = 6;
+  string section_num = 7;
+  bool is_suppl = 8; // 附則 vs 本則
+  string sentence_text = 9; // normative text (art. 13 free)
+  int32 ordinal = 10;
+}
+
+// A recorded change to a law: the structural diff + classification of one
+// in-force-text transition. Provenance into observation via observation_seq.
+message LawNodeChange {
+  string eid = 1;
+  string op = 2; // added | deleted | modified | moved
+  string node_type = 3;
+  string num = 4;
+}
+message LawChange {
+  int64 observation_seq = 1; // backing observation.event.seq (provenance)
+  string differ_version = 2;
+  string classification = 3; // administrative | substantive
+  string class_confidence = 4; // high | medium | low
+  string observed_at = 5; // RFC3339 UTC, when the changed text was observed
+  repeated LawNodeChange node_changes = 6;
+}
+
+message GetLawRequest {
+  string law_id = 1;
+}
+message GetLawResponse {
+  Law law = 1;
+  repeated LawNode nodes = 2;
+}
+
+message ListLawsRequest {
+  string law_type = 1; // "" = any
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListLawsResponse {
+  repeated Law laws = 1;
+  string next_page_token = 2;
+}
+
+message GetLawChangesRequest {
+  string law_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message GetLawChangesResponse {
+  repeated LawChange changes = 1;
+  string next_page_token = 2;
 }

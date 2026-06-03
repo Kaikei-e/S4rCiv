@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package s4rciv.diff.v1;
+
+option go_package = "s4rciv.org/api/gen/s4rciv/diff/v1;diffv1";
+
+// DiffService computes the structural diff and administrative/substantive
+// classification of a law between two consecutive in-force snapshots.
+//
+// It is a STATELESS service (ADR-000005): the caller (Go, command side) owns the
+// database and persists the result into interpretation.change; the differ holds
+// no state and never touches Postgres. Snapshots are canonical (C14N) 法令標準XML
+// bytes. The differ is the sole owner of the diff algorithm and the classification
+// heuristic; the Go side only orchestrates and persists.
+service DiffService {
+  rpc ComputeChange(ComputeChangeRequest) returns (ComputeChangeResponse);
+}
+
+message ComputeChangeRequest {
+  string stream_id = 1; // 'egov-law:<law_id>' — context only
+  string media_type = 2; // 'application/xml' (法令標準XML)
+  bytes prev_snapshot = 3; // canonical XML of the previous in-force text; empty on first revision
+  bytes curr_snapshot = 4; // canonical XML of the current in-force text
+}
+
+enum ChangeOp {
+  CHANGE_OP_UNSPECIFIED = 0;
+  CHANGE_OP_ADDED = 1;
+  CHANGE_OP_DELETED = 2;
+  CHANGE_OP_MODIFIED = 3;
+  CHANGE_OP_MOVED = 4;
+}
+
+// A node-level change keyed by AKN eId — the same identity the Go projector writes
+// to interpretation.law_node (ADR-000005 shared-identity contract), so a change
+// joins to its node row.
+message NodeChange {
+  string eid = 1; // AKN element id, e.g. 'art_9__para_1'
+  ChangeOp op = 2;
+  string node_type = 3; // 'article' | 'paragraph' | 'item' | 'suppl_provision'
+  string num = 4; // number token of the node ('9', '9_2' for 第9条の2)
+  string prev_text = 5; // normative text before; empty when added
+  string curr_text = 6; // normative text after; empty when deleted
+}
+
+message ComputeChangeResponse {
+  string differ_version = 1; // stamps interpretation.change.differ_version (re-diff = reproject)
+  string classification = 2; // 'administrative' | 'substantive'
+  string class_confidence = 3; // 'high' | 'medium' | 'low'
+  repeated NodeChange node_changes = 4;
+}

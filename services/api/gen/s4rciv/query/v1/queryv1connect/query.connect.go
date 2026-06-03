@@ -41,6 +41,13 @@ const (
 	// QueryServiceGetVoteEventProcedure is the fully-qualified name of the QueryService's GetVoteEvent
 	// RPC.
 	QueryServiceGetVoteEventProcedure = "/s4rciv.query.v1.QueryService/GetVoteEvent"
+	// QueryServiceGetLawProcedure is the fully-qualified name of the QueryService's GetLaw RPC.
+	QueryServiceGetLawProcedure = "/s4rciv.query.v1.QueryService/GetLaw"
+	// QueryServiceListLawsProcedure is the fully-qualified name of the QueryService's ListLaws RPC.
+	QueryServiceListLawsProcedure = "/s4rciv.query.v1.QueryService/ListLaws"
+	// QueryServiceGetLawChangesProcedure is the fully-qualified name of the QueryService's
+	// GetLawChanges RPC.
+	QueryServiceGetLawChangesProcedure = "/s4rciv.query.v1.QueryService/GetLawChanges"
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -48,6 +55,11 @@ type QueryServiceClient interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
 	ListMeetings(context.Context, *connect.Request[v1.ListMeetingsRequest]) (*connect.Response[v1.ListMeetingsResponse], error)
 	GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error)
+	// e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
+	// so full text is served freely with attribution (ADR-000005, source seed comment).
+	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
+	ListLaws(context.Context, *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error)
+	GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error)
 }
 
 // NewQueryServiceClient constructs a client for the s4rciv.query.v1.QueryService service. By
@@ -79,14 +91,35 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceMethods.ByName("GetVoteEvent")),
 			connect.WithClientOptions(opts...),
 		),
+		getLaw: connect.NewClient[v1.GetLawRequest, v1.GetLawResponse](
+			httpClient,
+			baseURL+QueryServiceGetLawProcedure,
+			connect.WithSchema(queryServiceMethods.ByName("GetLaw")),
+			connect.WithClientOptions(opts...),
+		),
+		listLaws: connect.NewClient[v1.ListLawsRequest, v1.ListLawsResponse](
+			httpClient,
+			baseURL+QueryServiceListLawsProcedure,
+			connect.WithSchema(queryServiceMethods.ByName("ListLaws")),
+			connect.WithClientOptions(opts...),
+		),
+		getLawChanges: connect.NewClient[v1.GetLawChangesRequest, v1.GetLawChangesResponse](
+			httpClient,
+			baseURL+QueryServiceGetLawChangesProcedure,
+			connect.WithSchema(queryServiceMethods.ByName("GetLawChanges")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // queryServiceClient implements QueryServiceClient.
 type queryServiceClient struct {
-	getMeeting   *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
-	listMeetings *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
-	getVoteEvent *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
+	getMeeting    *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
+	listMeetings  *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
+	getVoteEvent  *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
+	getLaw        *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
+	listLaws      *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
+	getLawChanges *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -104,11 +137,31 @@ func (c *queryServiceClient) GetVoteEvent(ctx context.Context, req *connect.Requ
 	return c.getVoteEvent.CallUnary(ctx, req)
 }
 
+// GetLaw calls s4rciv.query.v1.QueryService.GetLaw.
+func (c *queryServiceClient) GetLaw(ctx context.Context, req *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error) {
+	return c.getLaw.CallUnary(ctx, req)
+}
+
+// ListLaws calls s4rciv.query.v1.QueryService.ListLaws.
+func (c *queryServiceClient) ListLaws(ctx context.Context, req *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error) {
+	return c.listLaws.CallUnary(ctx, req)
+}
+
+// GetLawChanges calls s4rciv.query.v1.QueryService.GetLawChanges.
+func (c *queryServiceClient) GetLawChanges(ctx context.Context, req *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error) {
+	return c.getLawChanges.CallUnary(ctx, req)
+}
+
 // QueryServiceHandler is an implementation of the s4rciv.query.v1.QueryService service.
 type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
 	ListMeetings(context.Context, *connect.Request[v1.ListMeetingsRequest]) (*connect.Response[v1.ListMeetingsResponse], error)
 	GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error)
+	// e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
+	// so full text is served freely with attribution (ADR-000005, source seed comment).
+	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
+	ListLaws(context.Context, *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error)
+	GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error)
 }
 
 // NewQueryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -136,6 +189,24 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceMethods.ByName("GetVoteEvent")),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceGetLawHandler := connect.NewUnaryHandler(
+		QueryServiceGetLawProcedure,
+		svc.GetLaw,
+		connect.WithSchema(queryServiceMethods.ByName("GetLaw")),
+		connect.WithHandlerOptions(opts...),
+	)
+	queryServiceListLawsHandler := connect.NewUnaryHandler(
+		QueryServiceListLawsProcedure,
+		svc.ListLaws,
+		connect.WithSchema(queryServiceMethods.ByName("ListLaws")),
+		connect.WithHandlerOptions(opts...),
+	)
+	queryServiceGetLawChangesHandler := connect.NewUnaryHandler(
+		QueryServiceGetLawChangesProcedure,
+		svc.GetLawChanges,
+		connect.WithSchema(queryServiceMethods.ByName("GetLawChanges")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/s4rciv.query.v1.QueryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case QueryServiceGetMeetingProcedure:
@@ -144,6 +215,12 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceListMeetingsHandler.ServeHTTP(w, r)
 		case QueryServiceGetVoteEventProcedure:
 			queryServiceGetVoteEventHandler.ServeHTTP(w, r)
+		case QueryServiceGetLawProcedure:
+			queryServiceGetLawHandler.ServeHTTP(w, r)
+		case QueryServiceListLawsProcedure:
+			queryServiceListLawsHandler.ServeHTTP(w, r)
+		case QueryServiceGetLawChangesProcedure:
+			queryServiceGetLawChangesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -163,4 +240,16 @@ func (UnimplementedQueryServiceHandler) ListMeetings(context.Context, *connect.R
 
 func (UnimplementedQueryServiceHandler) GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetVoteEvent is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetLaw is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListLaws(context.Context, *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListLaws is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetLawChanges is not implemented"))
 }
