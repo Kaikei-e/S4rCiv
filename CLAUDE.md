@@ -12,7 +12,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-**Early scaffold (v0).** No feature code yet, but the stack skeleton exists: a Docker Compose stack (`compose.yaml`, project `s4rciv`) with Postgres 18 (`db`), Atlas migrations (`migrate`), a Go API stub (`services/api`), a Rust differ stub (`services/differ`), and a SvelteKit web stub (`web`). The **immutable data model schema is designed and migrated** — three schemas: `observation` (immutable, append-only, hash-chained ground truth), `interpretation` (two-tier: append-only `interpretation.event` + disposable read models), `control` (mutable operational state). See `db/migrations/`, `CONTEXT.md` (glossary), and `docs/ADR/000001`–`000002`. There are still no app build/lint/test commands wired beyond the stubs; add real ones here as they land. Local stack ops live in the `docker-compose` skill.
+**M1 (国会会議録 adapter) implemented; v0 scaffold otherwise.** Docker Compose stack (`compose.yaml`, project `s4rciv`): Postgres 18 (`db`), Atlas migrations (`migrate`), a Go `api` (read-only Connect-RPC query side), a Go `collector` (M1 command side; same `services/api` module, separate build target), a Rust differ stub (`services/differ`), and a SvelteKit web stub (`web`). The **immutable data model schema is designed and migrated** — three schemas: `observation` (immutable, append-only, hash-chained ground truth), `interpretation` (two-tier: append-only `interpretation.event` + disposable read models, incl. the M1 kokkai read models), `control` (mutable operational state). See `db/migrations/`, `CONTEXT.md` (glossary), and `docs/ADR/000001`–`000004`. Local stack ops live in the `docker-compose` skill.
+
+### M1 layout (`services/api`, clean architecture)
+
+`cmd/api` (Connect-RPC query Handler) · `cmd/collector` (CLI Handler: `run`/`poll-once`/`reproject`/`discover`) → `internal/usecase/{collect,project}` → `internal/port` → `internal/gateway/kokkai` (anti-corruption + JCS canonicalization) + `internal/driver/{postgres,kokkaihttp,sys}`. Pure core in `internal/domain/{observation,legislative}` (log-hash via `HashableEvent` proto, ADR-000003; vote parser; Popolo identity). Protobuf is `proto/` → committed `gen/` via buf.
+
+### Commands (run from `services/api`)
+
+- `go test ./...` — unit tests (DB-touching drivers are build-verified only; domain/usecase/gateway are fully unit-tested with fakes/fixtures, no live API).
+- `go vet ./...` — vet.
+- `buf generate` (+ `buf lint`) — regenerate `gen/` after editing `proto/` (needs `protoc-gen-go` + `protoc-gen-connect-go` on PATH).
+- `atlas migrate hash --env local` (from repo root) — rehash after adding a migration.
+- `collector run|poll-once|reproject|discover --from YYYY-MM-DD --until YYYY-MM-DD` — collector subcommands.
 
 ## What S4rCiv is
 

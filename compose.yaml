@@ -58,6 +58,7 @@ services:
   api:
     build:
       context: ./services/api
+      target: api
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -79,6 +80,33 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    restart: unless-stopped
+
+  collector:
+    build:
+      context: ./services/api
+      target: collector
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Command side (CQRS): discovers/polls kokkai and projects read models.
+    # Default command is the daemon; override for one-shot ops, e.g.
+    #   docker compose run --rm collector discover --from 2024-01-01 --until 2024-01-31
+    command: ["run"]
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      USER_AGENT: ${USER_AGENT}
+    secrets:
+      - db_password
     security_opt:
       - no-new-privileges:true
     cap_drop:
