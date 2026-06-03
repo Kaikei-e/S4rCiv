@@ -94,7 +94,10 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Command side (CQRS): discovers/polls kokkai and projects read models.
+      differ:
+        condition: service_started
+    # Command side (CQRS): discovers/polls sources and projects read models.
+    # The egov-law diff usecase calls the differ over Connect-RPC at DIFFER_URL.
     # Default command is the daemon; override for one-shot ops, e.g.
     #   docker compose run --rm collector discover --from 2024-01-01 --until 2024-01-31
     command: ["run"]
@@ -105,6 +108,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       DB_PASSWORD_FILE: /run/secrets/db_password
       USER_AGENT: ${USER_AGENT}
+      DIFFER_URL: http://differ:9090
     secrets:
       - db_password
     security_opt:
@@ -117,17 +121,11 @@ services:
   differ:
     build:
       context: ./services/differ
-    depends_on:
-      db:
-        condition: service_healthy
+    # Stateless structural-diff service (ADR-000005): no database, no secrets.
+    # The collector calls it over Connect-RPC; reachable on the compose network as
+    # differ:9090. It only computes 法令標準XML diffs + classification from bytes.
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_DB: ${POSTGRES_DB}
-      DB_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
-      - db_password
+      DIFFER_PORT: "9090"
     security_opt:
       - no-new-privileges:true
     cap_drop:
