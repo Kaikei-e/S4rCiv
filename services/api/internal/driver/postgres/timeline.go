@@ -45,8 +45,8 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		  -- The timeline only shows the sources it can ENRICH with a headline read model
 		  -- (kokkai 会議録 / egov-law 法令). Vote-map support sources (giin-roster,
 		  -- sangiin-roster, sangiin-vote) are reference data surfaced via the 衆院/参院 maps,
-		  -- not the citizen change-timeline / Atom feed (ADR-000006/000007/000010). A
-		  -- whitelist (not a per-source exclusion) keeps future sources from leaking in.
+		  -- not the citizen change-timeline / Atom feed (ADR-000006/000007/000010). An
+		  -- allowlist (not a per-source denylist) keeps future sources from leaking in.
 		  AND e.source IN ('kokkai', 'egov-law')
 		  AND ($2 = '' OR e.source = $2)
 		  AND ($3 = '' OR e.type::text = $3)
