@@ -20,7 +20,9 @@ import type {
 	GetMeetingResponse,
 	ListLegislatorVotesResponse,
 	GetVoteEventResponse,
-	ListVoteEventsResponse
+	ListVoteEventsResponse,
+	ListSangiinVoteEventsResponse,
+	GetSangiinVoteMapResponse
 } from '$lib/types';
 
 const BASE = (env.API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
@@ -67,4 +69,15 @@ export async function listVoteEvents(session = 0): Promise<ListVoteEventsRespons
 	return json<ListVoteEventsResponse>(
 		await client.listVoteEvents({ session, mappableOnly: true, pageSize: 100 })
 	);
+}
+
+// 参議院本会議投票結果 (ADR-000010).
+export async function listSangiinVoteEvents(session = 0): Promise<ListSangiinVoteEventsResponse> {
+	return json<ListSangiinVoteEventsResponse>(
+		await client.listSangiinVoteEvents({ session, pageSize: 100 })
+	);
+}
+
+export async function getSangiinVoteMap(voteEventId: string): Promise<GetSangiinVoteMapResponse> {
+	return json<GetSangiinVoteMapResponse>(await client.getSangiinVoteMap({ voteEventId }));
 }

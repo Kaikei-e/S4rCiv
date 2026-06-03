@@ -216,3 +216,49 @@ export interface ListVoteEventsResponse {
 	voteEvents?: VoteEventSummary[];
 	nextPageToken?: string;
 }
+
+// ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────────
+
+export interface SangiinVoteEventSummary {
+	voteEventId?: string;
+	session?: number;
+	motion?: string;
+	date?: string;
+	yesCount?: number;
+	noCount?: number;
+	attribution?: Attribution;
+}
+
+export interface ListSangiinVoteEventsResponse {
+	session?: number;
+	voteEvents?: SangiinVoteEventSummary[];
+	nextPageToken?: string;
+}
+
+export interface PrefectureTally {
+	districtCode?: string; // JIS prefecture code(s); "31,32" for a 合区
+	districtName?: string;
+	yes?: number;
+	no?: number;
+	abstain?: number;
+}
+
+export interface SangiinPrVote {
+	voterName?: string;
+	option?: string; // yes | no | abstain
+	parliamentaryGroup?: string;
+}
+
+export interface GetSangiinVoteMapResponse {
+	voteEventId?: string;
+	session?: number;
+	motion?: string;
+	date?: string;
+	yesCount?: number;
+	noCount?: number;
+	prefectures?: PrefectureTally[];
+	prVotes?: SangiinPrVote[];
+	totalVotes?: number;
+	matchedVotes?: number;
+	attribution?: Attribution;
+}

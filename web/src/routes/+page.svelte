@@ -36,7 +36,8 @@
 		<h1>S4rCiv <span class="label">公的記録の司令室</span></h1>
 	</div>
 	<nav class="topnav">
-		<a class="navlink" href="/votes" title="記名投票を選挙区別に地図で見る">🗺 選挙区投票地図</a>
+		<a class="navlink" href="/votes" title="衆院の記名投票を小選挙区別に地図で見る">🗺 衆院</a>
+		<a class="navlink" href="/sangiin" title="参院の記名投票を都道府県別に地図で見る">🗺 参院</a>
 		<a class="feed" href={feedHref} title="この絞り込みの Atom フィードを購読（ウォッチ）">📡 RSS</a>
 	</nav>
 </header>

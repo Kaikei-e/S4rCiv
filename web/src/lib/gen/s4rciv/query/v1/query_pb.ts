@@ -1653,6 +1653,457 @@ export class GetLawChangesResponse extends Message<GetLawChangesResponse> {
 }
 
 /**
+ * @generated from message s4rciv.query.v1.SangiinVoteEventSummary
+ */
+export class SangiinVoteEventSummary extends Message<SangiinVoteEventSummary> {
+  /**
+   * page slug, e.g. "221-0407-v001"
+   *
+   * @generated from field: string vote_event_id = 1;
+   */
+  voteEventId = "";
+
+  /**
+   * @generated from field: int32 session = 2;
+   */
+  session = 0;
+
+  /**
+   * 議案件名
+   *
+   * @generated from field: string motion = 3;
+   */
+  motion = "";
+
+  /**
+   * YYYY-MM-DD
+   *
+   * @generated from field: string date = 4;
+   */
+  date = "";
+
+  /**
+   * 賛成票 (announced)
+   *
+   * @generated from field: int32 yes_count = 5;
+   */
+  yesCount = 0;
+
+  /**
+   * 反対票 (announced)
+   *
+   * @generated from field: int32 no_count = 6;
+   */
+  noCount = 0;
+
+  /**
+   * @generated from field: s4rciv.query.v1.Attribution attribution = 7;
+   */
+  attribution?: Attribution;
+
+  constructor(data?: PartialMessage<SangiinVoteEventSummary>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.SangiinVoteEventSummary";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "vote_event_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "session", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 3, name: "motion", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "yes_count", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 6, name: "no_count", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 7, name: "attribution", kind: "message", T: Attribution },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SangiinVoteEventSummary {
+    return new SangiinVoteEventSummary().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SangiinVoteEventSummary {
+    return new SangiinVoteEventSummary().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SangiinVoteEventSummary {
+    return new SangiinVoteEventSummary().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SangiinVoteEventSummary | PlainMessage<SangiinVoteEventSummary> | undefined, b: SangiinVoteEventSummary | PlainMessage<SangiinVoteEventSummary> | undefined): boolean {
+    return proto3.util.equals(SangiinVoteEventSummary, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.ListSangiinVoteEventsRequest
+ */
+export class ListSangiinVoteEventsRequest extends Message<ListSangiinVoteEventsRequest> {
+  /**
+   * 0 = latest
+   *
+   * @generated from field: int32 session = 1;
+   */
+  session = 0;
+
+  /**
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize = 0;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken = "";
+
+  constructor(data?: PartialMessage<ListSangiinVoteEventsRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.ListSangiinVoteEventsRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "session", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 2, name: "page_size", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 3, name: "page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListSangiinVoteEventsRequest {
+    return new ListSangiinVoteEventsRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListSangiinVoteEventsRequest {
+    return new ListSangiinVoteEventsRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListSangiinVoteEventsRequest {
+    return new ListSangiinVoteEventsRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListSangiinVoteEventsRequest | PlainMessage<ListSangiinVoteEventsRequest> | undefined, b: ListSangiinVoteEventsRequest | PlainMessage<ListSangiinVoteEventsRequest> | undefined): boolean {
+    return proto3.util.equals(ListSangiinVoteEventsRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.ListSangiinVoteEventsResponse
+ */
+export class ListSangiinVoteEventsResponse extends Message<ListSangiinVoteEventsResponse> {
+  /**
+   * @generated from field: int32 session = 1;
+   */
+  session = 0;
+
+  /**
+   * @generated from field: repeated s4rciv.query.v1.SangiinVoteEventSummary vote_events = 2;
+   */
+  voteEvents: SangiinVoteEventSummary[] = [];
+
+  /**
+   * @generated from field: string next_page_token = 3;
+   */
+  nextPageToken = "";
+
+  constructor(data?: PartialMessage<ListSangiinVoteEventsResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.ListSangiinVoteEventsResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "session", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 2, name: "vote_events", kind: "message", T: SangiinVoteEventSummary, repeated: true },
+    { no: 3, name: "next_page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListSangiinVoteEventsResponse {
+    return new ListSangiinVoteEventsResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListSangiinVoteEventsResponse {
+    return new ListSangiinVoteEventsResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListSangiinVoteEventsResponse {
+    return new ListSangiinVoteEventsResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListSangiinVoteEventsResponse | PlainMessage<ListSangiinVoteEventsResponse> | undefined, b: ListSangiinVoteEventsResponse | PlainMessage<ListSangiinVoteEventsResponse> | undefined): boolean {
+    return proto3.util.equals(ListSangiinVoteEventsResponse, a, b);
+  }
+}
+
+/**
+ * One 都道府県 selection district's 内訳 (raw counts, NOT a rate). The map fills each
+ * prefecture by a FACTUAL category derived from these (全員賛成 / 全員反対 / 割れ / 記録
+ * なし) — never a 賛同率 heatmap (§3/§5-C). The raw counts are shown in context (§7).
+ *
+ * @generated from message s4rciv.query.v1.PrefectureTally
+ */
+export class PrefectureTally extends Message<PrefectureTally> {
+  /**
+   * JIS prefecture code(s); "31,32" for a 合区
+   *
+   * @generated from field: string district_code = 1;
+   */
+  districtCode = "";
+
+  /**
+   * 東京 / 鳥取・島根
+   *
+   * @generated from field: string district_name = 2;
+   */
+  districtName = "";
+
+  /**
+   * @generated from field: int32 yes = 3;
+   */
+  yes = 0;
+
+  /**
+   * @generated from field: int32 no = 4;
+   */
+  no = 0;
+
+  /**
+   * @generated from field: int32 abstain = 5;
+   */
+  abstain = 0;
+
+  constructor(data?: PartialMessage<PrefectureTally>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.PrefectureTally";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "district_code", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "district_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "yes", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 4, name: "no", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 5, name: "abstain", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): PrefectureTally {
+    return new PrefectureTally().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): PrefectureTally {
+    return new PrefectureTally().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): PrefectureTally {
+    return new PrefectureTally().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: PrefectureTally | PlainMessage<PrefectureTally> | undefined, b: PrefectureTally | PlainMessage<PrefectureTally> | undefined): boolean {
+    return proto3.util.equals(PrefectureTally, a, b);
+  }
+}
+
+/**
+ * One 比例 (全国区) member's vote — shown in the companion panel, never erased (§5).
+ *
+ * @generated from message s4rciv.query.v1.SangiinPrVote
+ */
+export class SangiinPrVote extends Message<SangiinPrVote> {
+  /**
+   * @generated from field: string voter_name = 1;
+   */
+  voterName = "";
+
+  /**
+   * yes | no | abstain
+   *
+   * @generated from field: string option = 2;
+   */
+  option = "";
+
+  /**
+   * 会派
+   *
+   * @generated from field: string parliamentary_group = 3;
+   */
+  parliamentaryGroup = "";
+
+  constructor(data?: PartialMessage<SangiinPrVote>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.SangiinPrVote";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "voter_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "option", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "parliamentary_group", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SangiinPrVote {
+    return new SangiinPrVote().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SangiinPrVote {
+    return new SangiinPrVote().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SangiinPrVote {
+    return new SangiinPrVote().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SangiinPrVote | PlainMessage<SangiinPrVote> | undefined, b: SangiinPrVote | PlainMessage<SangiinPrVote> | undefined): boolean {
+    return proto3.util.equals(SangiinPrVote, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.GetSangiinVoteMapRequest
+ */
+export class GetSangiinVoteMapRequest extends Message<GetSangiinVoteMapRequest> {
+  /**
+   * @generated from field: string vote_event_id = 1;
+   */
+  voteEventId = "";
+
+  constructor(data?: PartialMessage<GetSangiinVoteMapRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetSangiinVoteMapRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "vote_event_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetSangiinVoteMapRequest {
+    return new GetSangiinVoteMapRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetSangiinVoteMapRequest {
+    return new GetSangiinVoteMapRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetSangiinVoteMapRequest {
+    return new GetSangiinVoteMapRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetSangiinVoteMapRequest | PlainMessage<GetSangiinVoteMapRequest> | undefined, b: GetSangiinVoteMapRequest | PlainMessage<GetSangiinVoteMapRequest> | undefined): boolean {
+    return proto3.util.equals(GetSangiinVoteMapRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.GetSangiinVoteMapResponse
+ */
+export class GetSangiinVoteMapResponse extends Message<GetSangiinVoteMapResponse> {
+  /**
+   * @generated from field: string vote_event_id = 1;
+   */
+  voteEventId = "";
+
+  /**
+   * @generated from field: int32 session = 2;
+   */
+  session = 0;
+
+  /**
+   * @generated from field: string motion = 3;
+   */
+  motion = "";
+
+  /**
+   * @generated from field: string date = 4;
+   */
+  date = "";
+
+  /**
+   * announced totals
+   *
+   * @generated from field: int32 yes_count = 5;
+   */
+  yesCount = 0;
+
+  /**
+   * @generated from field: int32 no_count = 6;
+   */
+  noCount = 0;
+
+  /**
+   * choropleth data (都道府県 内訳)
+   *
+   * @generated from field: repeated s4rciv.query.v1.PrefectureTally prefectures = 7;
+   */
+  prefectures: PrefectureTally[] = [];
+
+  /**
+   * 比例 companion panel
+   *
+   * @generated from field: repeated s4rciv.query.v1.SangiinPrVote pr_votes = 8;
+   */
+  prVotes: SangiinPrVote[] = [];
+
+  /**
+   * coverage: all per-member rows
+   *
+   * @generated from field: int32 total_votes = 9;
+   */
+  totalVotes = 0;
+
+  /**
+   * rows joined to a roster member (the rest are 未集計)
+   *
+   * @generated from field: int32 matched_votes = 10;
+   */
+  matchedVotes = 0;
+
+  /**
+   * @generated from field: s4rciv.query.v1.Attribution attribution = 11;
+   */
+  attribution?: Attribution;
+
+  constructor(data?: PartialMessage<GetSangiinVoteMapResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetSangiinVoteMapResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "vote_event_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "session", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 3, name: "motion", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "yes_count", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 6, name: "no_count", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 7, name: "prefectures", kind: "message", T: PrefectureTally, repeated: true },
+    { no: 8, name: "pr_votes", kind: "message", T: SangiinPrVote, repeated: true },
+    { no: 9, name: "total_votes", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 10, name: "matched_votes", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 11, name: "attribution", kind: "message", T: Attribution },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetSangiinVoteMapResponse {
+    return new GetSangiinVoteMapResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetSangiinVoteMapResponse {
+    return new GetSangiinVoteMapResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetSangiinVoteMapResponse {
+    return new GetSangiinVoteMapResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetSangiinVoteMapResponse | PlainMessage<GetSangiinVoteMapResponse> | undefined, b: GetSangiinVoteMapResponse | PlainMessage<GetSangiinVoteMapResponse> | undefined): boolean {
+    return proto3.util.equals(GetSangiinVoteMapResponse, a, b);
+  }
+}
+
+/**
  * One human-readable entry on the cross-source timeline, backed 1:1 by an
  * observation.event. Status (event_type) and ordering (seq) come from the
  * immutable event; the human-readable body is injected from the interpretation

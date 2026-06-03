@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
+import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -103,6 +103,29 @@ export const QueryService = {
       name: "ListTimeline",
       I: ListTimelineRequest,
       O: ListTimelineResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ── 参議院本会議投票結果 マップ (ADR-000010) ──────────────────────────────────
+     * kokkai records 衆 votes as counts only, so the district vote map sources per-member
+     * votes from the 参議院 roll-call (touhyoulist), rendered over 都道府県 selection
+     * districts (1:N — a 内訳, never a 賛同率 heatmap; §3/§5-C).
+     *
+     * @generated from rpc s4rciv.query.v1.QueryService.ListSangiinVoteEvents
+     */
+    listSangiinVoteEvents: {
+      name: "ListSangiinVoteEvents",
+      I: ListSangiinVoteEventsRequest,
+      O: ListSangiinVoteEventsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc s4rciv.query.v1.QueryService.GetSangiinVoteMap
+     */
+    getSangiinVoteMap: {
+      name: "GetSangiinVoteMap",
+      I: GetSangiinVoteMapRequest,
+      O: GetSangiinVoteMapResponse,
       kind: MethodKind.Unary,
     },
     /**
