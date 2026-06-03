@@ -61,6 +61,43 @@ func NewShugiinRosterEntry(name, yomi, group, senkyoku string) (RosterEntry, boo
 	}, true
 }
 
+// NewSangiinRosterEntry builds a 参議院 roster entry from one 議員一覧 row
+// (議員氏名 / 読み方 / 会派 / 選挙区). 選挙区 is a 都道府県 name, a 合区 ("鳥取・島根"), or
+// "比例" (全国区, ADR-000010). For the 参 map, district_code is the JIS prefecture
+// code(s) (NOT the 衆 ken*100+ku kucode); the house field distinguishes the two
+// schemes. 合区 carries both codes, comma-joined, so the map can colour both.
+func NewSangiinRosterEntry(name, yomi, group, senkyoku string) (RosterEntry, bool) {
+	pid, conf := PersonIdentity(name, yomi)
+	e := RosterEntry{
+		PersonID:           pid,
+		Name:               displayName(name),
+		Yomi:               collapseSpaces(yomi),
+		House:              HouseCouncillors,
+		ParliamentaryGroup: strings.TrimSpace(group),
+		IdentityConfidence: conf,
+	}
+	s := strings.TrimSpace(senkyoku)
+	if s == "比例" || s == "比例代表" {
+		e.IsPR = true
+		e.PRBlock = "全国"
+		return e, true
+	}
+	var codes []string
+	for _, p := range strings.Split(s, "・") { // 合区 splits on ・
+		c, ok := prefectureCode[strings.TrimSpace(p)]
+		if !ok {
+			return RosterEntry{}, false
+		}
+		codes = append(codes, strconv.Itoa(c))
+	}
+	if len(codes) == 0 {
+		return RosterEntry{}, false
+	}
+	e.DistrictCode = strings.Join(codes, ",")
+	e.DistrictName = s
+	return e, true
+}
+
 // parseShugiinDistrict normalizes the 衆議院 選挙区 cell. Single-member districts are
 // written "<県名><番号>" with no 都/道/府/県 or 区 suffix (e.g. "栃木3", "鳥取2"); 比例
 // is "比例<ブロック>" (e.g. "比例東海"). The district code is ken*100+番号 so it equals

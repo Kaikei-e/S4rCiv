@@ -2,9 +2,9 @@ package legislative
 
 import "testing"
 
-// Cases use VERBATIM 選挙区 strings from the live 衆議院 議員一覧 (栃木3 / 愛知6 / 比例東海 /
+// Cases use VERBATIM 選挙区 strings from the live 衆議院 議員一覧 (栃木3 / 愛知6 / （比）東海 /
 // 比例東京) and a district whose code is cross-checked against the SmartNews/国土数値情報
-// GeoJSON property (鳥取2 → kucode 3102).
+// GeoJSON property (鳥取2 → kucode 3102). Person names are fictional throughout.
 func TestParseShugiinDistrict(t *testing.T) {
 	cases := []struct {
 		senkyoku string
@@ -41,7 +41,7 @@ func TestParseShugiinDistrict(t *testing.T) {
 // The geometry-binding invariant mirrors the migration CHECK: a district member has
 // a code and no PR block; a 比例 member has a block and no code (never half-bound).
 func TestNewShugiinRosterEntryInvariant(t *testing.T) {
-	d, ok := NewShugiinRosterEntry("岡田 克也", "おかだ かつや", "自民", "愛知6")
+	d, ok := NewShugiinRosterEntry("山田 太郎", "やまだ たろう", "自民", "愛知6")
 	if !ok {
 		t.Fatal("district row should parse")
 	}
@@ -52,7 +52,7 @@ func TestNewShugiinRosterEntryInvariant(t *testing.T) {
 		t.Errorf("name+yomi should be high confidence, got %s", d.IdentityConfidence)
 	}
 
-	p, ok := NewShugiinRosterEntry("秋本 真利", "あきもと まさとし", "自民", "比例東京")
+	p, ok := NewShugiinRosterEntry("鈴木 一郎", "すずき いちろう", "自民", "比例東京")
 	if !ok {
 		t.Fatal("PR row should parse")
 	}
@@ -65,14 +65,37 @@ func TestNewShugiinRosterEntryInvariant(t *testing.T) {
 	}
 }
 
+// 参 roster row shapes from the live 221 名簿 (fictional names): 比例 → 全国区, 合区 → both
+// prefecture codes, plain 都道府県 → its JIS code (ADR-000010).
+func TestNewSangiinRosterEntry(t *testing.T) {
+	pr, ok := NewSangiinRosterEntry("山田　花子", "やまだ　はなこ", "立憲", "比例")
+	if !ok || !pr.IsPR || pr.House != HouseCouncillors || pr.PRBlock != "全国" || pr.DistrictCode != "" {
+		t.Fatalf("比例 entry malformed: %+v (ok=%v)", pr, ok)
+	}
+
+	go2, ok := NewSangiinRosterEntry("鈴木　一郎", "すずき　いちろう", "自民", "鳥取・島根")
+	if !ok || go2.IsPR || go2.DistrictCode != "31,32" || go2.DistrictName != "鳥取・島根" {
+		t.Fatalf("合区 entry malformed: %+v", go2)
+	}
+
+	tk, ok := NewSangiinRosterEntry("佐藤　太郎", "さとう　たろう", "自民", "東京")
+	if !ok || tk.DistrictCode != "13" || tk.DistrictName != "東京" || tk.IdentityConfidence != ConfidenceHigh {
+		t.Fatalf("都道府県 entry malformed: %+v", tk)
+	}
+
+	if _, ok := NewSangiinRosterEntry("名無し", "ななし", "無", "架空県"); ok {
+		t.Error("unknown prefecture should not parse")
+	}
+}
+
 // The roster person_id MUST equal the kokkai-derived id for the same (name, yomi),
 // or the read-time vote⨝district join silently misses (ADR-000008 同一導出 discipline).
 func TestRosterPersonIDMatchesKokkaiIdentity(t *testing.T) {
-	d, ok := NewShugiinRosterEntry("岡田 克也", "おかだ かつや", "立憲", "三重3")
+	d, ok := NewShugiinRosterEntry("山田 太郎", "やまだ たろう", "立憲", "三重3")
 	if !ok {
 		t.Fatal("should parse")
 	}
-	want, _ := PersonIdentity("岡田 克也", "おかだ かつや")
+	want, _ := PersonIdentity("山田 太郎", "やまだ たろう")
 	if d.PersonID != want {
 		t.Fatalf("roster person_id %s != kokkai identity %s", d.PersonID, want)
 	}
