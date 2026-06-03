@@ -126,7 +126,7 @@ func TestParseVotesCountsOnlyNeedsReview(t *testing.T) {
 // splitting would collapse the run into one name and degrade to needs-review.
 func TestParseVotesRunTogetherNamesSegmented(t *testing.T) {
 	text := "本案について記名投票を行います。投票総数四票、賛成者三、反対者一。" +
-		"賛成者逢沢一郎君青木ひとみ君佐藤花子君反対者田中次郎君以上"
+		"賛成者山田太郎君鈴木一郎君佐藤花子君反対者田中次郎君以上"
 	m := MeetingContent{Speeches: []Speech{{SpeechID: "s1", Text: text}}}
 
 	evs := ParseVotes(m)
@@ -143,8 +143,8 @@ func TestParseVotesRunTogetherNamesSegmented(t *testing.T) {
 			no = append(no, v.VoterName)
 		}
 	}
-	if strings.Join(yes, ",") != "逢沢一郎,青木ひとみ,佐藤花子" {
-		t.Errorf("yes voters = %v, want [逢沢一郎 青木ひとみ 佐藤花子]", yes)
+	if strings.Join(yes, ",") != "山田太郎,鈴木一郎,佐藤花子" {
+		t.Errorf("yes voters = %v, want [山田太郎 鈴木一郎 佐藤花子]", yes)
 	}
 	if strings.Join(no, ",") != "田中次郎" {
 		t.Errorf("no voters = %v, want [田中次郎]", no)
