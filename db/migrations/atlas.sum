@@ -1,4 +1,4 @@
-h1:sg5C/ioAP/kSvAn1Gd48m+4+VetUpJNrgGRAGsWeJJA=
+h1:/G7+fgy7MTRVDKEOjF+B5ukTYduFCU8nbf8P/W8bOkg=
 20260602000000_init.sql h1:yqgIHQzAlQ2poB6u5BBahFLlZZLLQ3rIjUG3xnNJ7PU=
 20260603000001_observation_plane.sql h1:DnlLhY2F1nwyCMkZUFYHkaKX3vwbfJ3izJvSqN3QRQs=
 20260603000002_interpretation_plane.sql h1:vGAb1vXzwCNkn1Hv9vqJw3fJj9Ah5RaMM0Dtaqu7lzY=
@@ -10,3 +10,5 @@ h1:sg5C/ioAP/kSvAn1Gd48m+4+VetUpJNrgGRAGsWeJJA=
 20260603000008_egov_source_seed.sql h1:LrxIVRdkE+Ij0mekHqpygQIg7bqpgXSDt1JmIG4QAmM=
 20260603000009_vote_person_index.sql h1:6Jug3g2fmZ4I6gRHJXGkLUA8ue+XY2wR9tIjcvx38ZU=
 20260603000010_source_rate_limit_30s.sql h1:NFWhYa5BDAVgrerzE3n65/omuGrmsgM0EmxKTOXHP8A=
+20260603000011_legislator_district_read_model.sql h1:eGlKw1AsxfzeiHUcmw3NosCZvirtX8NWJTfa5EYRroY=
+20260603000012_giin_roster_source_seed.sql h1:AJlm3nKKhctWGTNrNacfruEX9RFqW6Z1/yRGLk1nZs0=
