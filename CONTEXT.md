@@ -79,3 +79,7 @@ _Avoid_: review record, annotation
 **Read model（リードモデル）**:
 解釈面の disposable な projection。観測イベント＋解釈イベントを projector が fold して再生成する。いつでも truncate→replay できる前提で、ここに durable な事実を直接書かない。
 _Avoid_: view, cache, materialized table（機構名としては可）
+
+**Timeline（タイムライン）**:
+全 Source を横断する、時系列・人間可読な観測ログの projection。1項目はちょうど1つの Observation Event に対応し（1:1）、状態（observed/changed/vanished/restored）・観測時刻・出所はその Event 由来、「何が動いたか」の人間可読な中身は解釈面の各 projection 由来。Change の上位概念であり、`ResourceChanged` 由来の項目は Change を内包するが、`ResourceObserved`/`ResourceVanished`/`ResourceRestored` 由来の項目は Change ではない（diff を持たない）。市民が「いつ・何が・どう変わったか」を辿る主動線。
+_Avoid_: feed, activity log, change log（Change と紛れる）, 単なる「変更履歴」
