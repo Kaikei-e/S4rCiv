@@ -152,10 +152,43 @@ func TestProjectorFoldsMeetingPopoloAndVotes(t *testing.T) {
 	}
 }
 
+// The meeting projector folds the shared observation log, which also carries
+// other sources' streams (e.g. egov-law AKN XML). It must skip those — not try
+// to JSON-parse them — yet still advance its offset past them, otherwise it
+// wedges on the first foreign event and re-fails every poll.
+func TestProjectorSkipsForeignStreams(t *testing.T) {
+	snap := fixtureSnapshot(t)
+	reader := fakeReader{evs: []port.ObservedEvent{
+		{Seq: 6, StreamID: "egov-law:322M40000100023", Type: obs.ResourceObserved,
+			ObservedAt: time.Unix(1, 0).UTC(), SnapshotBytes: []byte("<Law>…</Law>")},
+		{Seq: 7, StreamID: "kokkai:121815254X00120240115", Type: obs.ResourceObserved,
+			ObservedAt: time.Unix(2, 0).UTC(), SnapshotBytes: snap},
+	}}
+	store := &fakeStore{}
+	offsets := &fakeOffsets{}
+	p := New(reader, kokkai.New(nil), store, offsets, "kokkai")
+
+	n, err := p.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run errored on a foreign stream: %v", err)
+	}
+	if n != 1 || len(store.batches) != 1 {
+		t.Fatalf("projected %d / batches %d, want 1/1 (only the kokkai event)", n, len(store.batches))
+	}
+	if store.batches[0].Meeting.IssueID != "121815254X00120240115" {
+		t.Fatalf("projected the wrong stream: %+v", store.batches[0].Meeting)
+	}
+	// Offset advanced past the foreign event, not wedged at 5.
+	if offsets.off != 7 {
+		t.Fatalf("offset = %d, want 7 (advanced past the egov-law event)", offsets.off)
+	}
+}
+
 func TestReprojectResetsAndReplays(t *testing.T) {
 	snap := fixtureSnapshot(t)
 	reader := fakeReader{evs: []port.ObservedEvent{
-		{Seq: 5, Type: obs.ResourceObserved, SnapshotBytes: snap, ObservedAt: time.Unix(1, 0).UTC()},
+		{Seq: 5, StreamID: "kokkai:121815254X00120240115", Type: obs.ResourceObserved,
+			SnapshotBytes: snap, ObservedAt: time.Unix(1, 0).UTC()},
 	}}
 	store := &fakeStore{}
 	offsets := &fakeOffsets{off: 5} // pretend already caught up

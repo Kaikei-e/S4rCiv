@@ -35,7 +35,7 @@ type Gateway struct {
 func New(h httpGetter) *Gateway { return &Gateway{http: h} }
 
 // StreamID is the deterministic stream identity for an issueID.
-func StreamID(issueID string) string { return SourceName + ":" + issueID }
+func StreamID(issueID string) string { return leg.MeetingStreamID(issueID) }
 
 // Fetch GETs one meeting by issueID, drops the query envelope, JCS-canonicalizes
 // the meetingRecord and content-addresses it. Absence (404 or empty result) is

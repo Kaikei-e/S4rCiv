@@ -40,3 +40,9 @@ type MeetingContent struct {
 	Speeches          []Speech
 	SourcePublishedAt *time.Time
 }
+
+// MeetingStreamID is the deterministic stream identity for a 21-char issueID
+// (国会会議録). It mirrors LawStreamID: the prefix matches the kokkai adapter's
+// SourceName, so a projector folding the shared observation log can select only
+// kokkai streams (and skip other sources' snapshots).
+func MeetingStreamID(issueID string) string { return "kokkai:" + issueID }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	leg "s4rciv.org/api/internal/domain/legislative"
 	"s4rciv.org/api/internal/port"
@@ -28,8 +29,8 @@ func New(reader port.EventReader, norm port.Normalizer, store port.ReadModelStor
 	return &Projector{reader: reader, norm: norm, store: store, offsets: offsets, name: name, batchSize: DefaultBatchSize}
 }
 
-// Run folds every observation event past the stored offset. Returns how many
-// content-bearing events were projected.
+// Run folds every observation event past the stored offset, projecting only
+// kokkai streams. Returns how many meeting snapshots were projected.
 func (p *Projector) Run(ctx context.Context) (int, error) {
 	off, err := p.offsets.Offset(ctx, p.name)
 	if err != nil {
@@ -45,9 +46,10 @@ func (p *Projector) Run(ctx context.Context) (int, error) {
 			return processed, nil
 		}
 		for _, ev := range evs {
-			// ResourceVanished carries no snapshot; nothing to project, but the
-			// offset still advances past it.
-			if ev.SnapshotBytes != nil {
+			// ResourceVanished carries no snapshot; other sources' streams (e.g.
+			// egov-law AKN XML) share this log but are not meetings. Either way
+			// nothing to project, but the offset still advances past it.
+			if ev.SnapshotBytes != nil && isKokkaiStream(ev.StreamID) {
 				if err := p.project(ctx, ev); err != nil {
 					return processed, fmt.Errorf("project seq %d: %w", ev.Seq, err)
 				}
@@ -70,6 +72,13 @@ func (p *Projector) Reproject(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("begin rebuild: %w", err)
 	}
 	return p.Run(ctx)
+}
+
+// isKokkaiStream reports whether streamID belongs to the kokkai (国会会議録)
+// adapter. The meeting projector folds the shared observation log, so it must
+// skip other sources' snapshots (e.g. egov-law AKN XML), mirroring LawProjector.
+func isKokkaiStream(streamID string) bool {
+	return strings.HasPrefix(streamID, leg.MeetingStreamID(""))
 }
 
 func (p *Projector) project(ctx context.Context, ev port.ObservedEvent) error {
