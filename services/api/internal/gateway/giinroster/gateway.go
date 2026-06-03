@@ -96,17 +96,13 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 	}, nil
 }
 
-// ParseRoster walks the UTF-8 roster HTML and normalizes each 衆議院議員一覧 row
+// ParseRoster reads the UTF-8 roster HTML and normalizes each 衆議院議員一覧 row
 // (氏名 / ふりがな / 会派 / 選挙区 / 当選回数) into a RosterEntry. A row is a member iff it
 // has 5 cells AND its 選挙区 parses — the header ("選挙区") and navigation rows fail that
 // test and are skipped, so the domain parser is itself the filter.
 func (g *Gateway) ParseRoster(content []byte) ([]leg.RosterEntry, error) {
-	doc, err := html.Parse(bytes.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("parse roster html: %w", err)
-	}
 	var out []leg.RosterEntry
-	for _, cells := range tableRows(doc) {
+	for _, cells := range tableRows(content) {
 		if len(cells) != 5 {
 			continue
 		}
@@ -118,44 +114,51 @@ func (g *Gateway) ParseRoster(content []byte) ([]leg.RosterEntry, error) {
 }
 
 // tableRows returns the trimmed text of each <tr>'s <td> cells in document order.
-func tableRows(root *html.Node) [][]string {
+// It uses the TOKENIZER, not html.Parse: the 衆 roster is old Domino-generated HTML
+// whose malformed table markup makes the strict HTML5 tree parser foster-parent the
+// rows out of the table (losing them). A linear token scan is robust to that.
+func tableRows(content []byte) [][]string {
+	z := html.NewTokenizer(bytes.NewReader(content))
 	var rows [][]string
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "tr" {
-			var cells []string
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				if c.Type == html.ElementNode && c.Data == "td" {
-					cells = append(cells, cellText(c))
+	var cells []string
+	var cur strings.Builder
+	inTD, inRow := false, false
+	flushRow := func() {
+		if inRow && len(cells) > 0 {
+			rows = append(rows, cells)
+		}
+		cells, inRow = nil, false
+	}
+	for {
+		switch z.Next() {
+		case html.ErrorToken:
+			flushRow()
+			return rows
+		case html.StartTagToken, html.SelfClosingTagToken:
+			switch name, _ := z.TagName(); string(name) {
+			case "tr":
+				flushRow() // tolerate a missing </tr>
+				inRow = true
+			case "td", "th":
+				inTD = true
+				cur.Reset()
+			}
+		case html.EndTagToken:
+			switch name, _ := z.TagName(); string(name) {
+			case "td", "th":
+				if inTD {
+					cells = append(cells, strings.TrimSpace(cur.String()))
+					inTD = false
 				}
+			case "tr":
+				flushRow()
 			}
-			if len(cells) > 0 {
-				rows = append(rows, cells)
+		case html.TextToken:
+			if inTD {
+				cur.Write(z.Text())
 			}
-			return // a row's cells are leaves here; no nested tables on these pages
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
 		}
 	}
-	walk(root)
-	return rows
-}
-
-// cellText concatenates the text descendants of a <td> (through <TT>/<CENTER>/<a>).
-func cellText(td *html.Node) string {
-	var b strings.Builder
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.TextNode {
-			b.WriteString(n.Data)
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(td)
-	return strings.TrimSpace(b.String())
 }
 
 func decodeShiftJIS(b []byte) ([]byte, error) {
