@@ -1,4 +1,4 @@
-h1:rw5rEPPAmHOYqoVujeF4raAhaLn1+IqsEtLIpjvs2aw=
+h1:DVOfXAGcU0YCzXejvZ0tjyrmWTbGyCQGKjyMnned3zs=
 20260602000000_init.sql h1:yqgIHQzAlQ2poB6u5BBahFLlZZLLQ3rIjUG3xnNJ7PU=
 20260603000001_observation_plane.sql h1:DnlLhY2F1nwyCMkZUFYHkaKX3vwbfJ3izJvSqN3QRQs=
 20260603000002_interpretation_plane.sql h1:vGAb1vXzwCNkn1Hv9vqJw3fJj9Ah5RaMM0Dtaqu7lzY=
@@ -6,3 +6,5 @@ h1:rw5rEPPAmHOYqoVujeF4raAhaLn1+IqsEtLIpjvs2aw=
 20260603000004_kokkai_read_models.sql h1:itW9ZvwepE0LTdpLtc5Vo2RCBk6wF3vyCKzIVb0GErU=
 20260603000005_kokkai_source_seed.sql h1:UTqQW+UQ3s9EiJlLdDWYt0y30SzqjjjqIrfORVyD27c=
 20260603000006_vote_source_speech.sql h1:RpEpGgHXYKYYBmWsHdkUcKiliipxZagJHaqliBFTG1Q=
+20260603000007_egov_law_read_models.sql h1:ed8WcF1N+WfE1gGADmWUTrUAclmHFRzNvQF17FqnO6k=
+20260603000008_egov_source_seed.sql h1:DXlgh8kcEyaVYmBumfNFFIPrgU3TfT9fU7/FRKuaq/Q=
