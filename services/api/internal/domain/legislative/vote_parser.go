@@ -7,7 +7,7 @@ import (
 
 // ExtractorVersion stamps every projected vote so re-parsing with an improved
 // extractor is a reproject, not an in-place mutation (immutable-design-guard #6).
-const ExtractorVersion = "kokkai-vote/0.1.0"
+const ExtractorVersion = "kokkai-vote/0.2.0" // 0.2.0: Kagome-backed voter-name segmentation
 
 // Deterministic, no-LLM 記名投票 extraction (ADR/DISCIPLINE §6). The transcript
 // tail is free text with OCR noise, so this is best-effort and confidence-bearing:
@@ -151,15 +151,7 @@ func extractNameBlock(text, start string, stops []string) []string {
 			end = j
 		}
 	}
-	block := rest[:end]
-	var names []string
-	for _, n := range nameSplit.Split(block, -1) {
-		n = normalizeName(n)
-		if n != "" && !isRoleLabel(n) {
-			names = append(names, n)
-		}
-	}
-	return names
+	return splitVoterNames(rest[:end])
 }
 
 func stripSpaces(s string) string {

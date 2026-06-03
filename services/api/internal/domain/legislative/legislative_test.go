@@ -1,6 +1,9 @@
 package legislative
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPersonIdentityDeterministicAndConservative(t *testing.T) {
 	id1, c1 := PersonIdentity("山田　太郎", "ヤマダ　タロウ")
@@ -114,6 +117,40 @@ func TestParseVotesCountsOnlyNeedsReview(t *testing.T) {
 	}
 	if !ev.NeedsReview {
 		t.Fatal("medium-confidence event must need review")
+	}
+}
+
+// Real 記名投票 rosters suffix each voter with 君 and OCR can drop the separators,
+// running names together. Kagome segments at the 接尾 honorific, so the name list
+// still matches the announced counts (high confidence) where naive whitespace
+// splitting would collapse the run into one name and degrade to needs-review.
+func TestParseVotesRunTogetherNamesSegmented(t *testing.T) {
+	text := "本案について記名投票を行います。投票総数四票、賛成者三、反対者一。" +
+		"賛成者逢沢一郎君青木ひとみ君佐藤花子君反対者田中次郎君以上"
+	m := MeetingContent{Speeches: []Speech{{SpeechID: "s1", Text: text}}}
+
+	evs := ParseVotes(m)
+	if len(evs) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(evs))
+	}
+	ev := evs[0]
+	var yes, no []string
+	for _, v := range ev.Votes {
+		switch v.Option {
+		case "yes":
+			yes = append(yes, v.VoterName)
+		case "no":
+			no = append(no, v.VoterName)
+		}
+	}
+	if strings.Join(yes, ",") != "逢沢一郎,青木ひとみ,佐藤花子" {
+		t.Errorf("yes voters = %v, want [逢沢一郎 青木ひとみ 佐藤花子]", yes)
+	}
+	if strings.Join(no, ",") != "田中次郎" {
+		t.Errorf("no voters = %v, want [田中次郎]", no)
+	}
+	if ev.Confidence != ConfidenceHigh {
+		t.Errorf("confidence = %s, want high (names match counts after segmentation)", ev.Confidence)
 	}
 }
 
