@@ -2,6 +2,8 @@
 
 **_sentinel for civic records_** — 公的記録の受動・読取専用フライトレコーダ ＋ 市民のための司令室ダッシュボード
 
+「サーシヴ」と読む。*sentinel for civic* を詰めた綴り（`4r` ＝ "for"）。g0v が "gov-zero"、Decidim が「決めよう」を名乗るのと同じく、名前そのものに趣意を込めている。
+
 ![status](https://img.shields.io/badge/status-concept%20(v0)-orange)
 ![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg)](https://github.com/RichardLitt/standard-readme)
