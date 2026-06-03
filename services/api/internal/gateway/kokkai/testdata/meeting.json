@@ -1,0 +1,39 @@
+{
+  "numberOfRecords": 1,
+  "numberOfReturn": 1,
+  "startRecord": 1,
+  "nextRecordPosition": 0,
+  "meetingRecord": [
+    {
+      "issueID": "121815254X00120240115",
+      "session": 213,
+      "nameOfHouse": "衆議院",
+      "nameOfMeeting": "本会議",
+      "issue": "第1号",
+      "date": "2024-01-15",
+      "meetingURL": "https://kokkai.ndl.go.jp/txt/121815254X00120240115/0",
+      "speechRecord": [
+        {
+          "speechID": "121815254X00120240115_000",
+          "speechOrder": 0,
+          "speaker": "会議録情報",
+          "speakerYomi": "",
+          "speakerGroup": "",
+          "speakerPosition": "",
+          "speech": "第二百十三回国会衆議院本会議 第1号 令和六年一月十五日",
+          "speechURL": ""
+        },
+        {
+          "speechID": "121815254X00120240115_001",
+          "speechOrder": 1,
+          "speaker": "山田太郎",
+          "speakerYomi": "ヤマダタロウ",
+          "speakerGroup": "自由民主党",
+          "speakerPosition": "",
+          "speech": "ただいまの法律案について記名投票をもって採決いたします。投票総数四票、賛成者三、反対者一。よって本案は可決されました。賛成者　山田太郎　鈴木一郎　佐藤花子　反対者　田中次郎　以上",
+          "speechURL": "https://kokkai.ndl.go.jp/txt/121815254X00120240115/1"
+        }
+      ]
+    }
+  ]
+}

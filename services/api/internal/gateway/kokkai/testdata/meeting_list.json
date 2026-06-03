@@ -1,0 +1,26 @@
+{
+  "numberOfRecords": 2,
+  "numberOfReturn": 2,
+  "startRecord": 1,
+  "nextRecordPosition": 0,
+  "meetingRecord": [
+    {
+      "issueID": "121815254X00120240115",
+      "session": 213,
+      "nameOfHouse": "衆議院",
+      "nameOfMeeting": "本会議",
+      "issue": "第1号",
+      "date": "2024-01-15",
+      "meetingURL": "https://kokkai.ndl.go.jp/txt/121815254X00120240115/0"
+    },
+    {
+      "issueID": "121815254X00220240116",
+      "session": 213,
+      "nameOfHouse": "衆議院",
+      "nameOfMeeting": "本会議",
+      "issue": "第2号",
+      "date": "2024-01-16",
+      "meetingURL": "https://kokkai.ndl.go.jp/txt/121815254X00220240116/0"
+    }
+  ]
+}
