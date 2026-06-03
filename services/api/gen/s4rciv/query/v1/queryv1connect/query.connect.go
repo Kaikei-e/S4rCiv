@@ -41,6 +41,9 @@ const (
 	// QueryServiceGetVoteEventProcedure is the fully-qualified name of the QueryService's GetVoteEvent
 	// RPC.
 	QueryServiceGetVoteEventProcedure = "/s4rciv.query.v1.QueryService/GetVoteEvent"
+	// QueryServiceListVoteEventsProcedure is the fully-qualified name of the QueryService's
+	// ListVoteEvents RPC.
+	QueryServiceListVoteEventsProcedure = "/s4rciv.query.v1.QueryService/ListVoteEvents"
 	// QueryServiceGetLawProcedure is the fully-qualified name of the QueryService's GetLaw RPC.
 	QueryServiceGetLawProcedure = "/s4rciv.query.v1.QueryService/GetLaw"
 	// QueryServiceListLawsProcedure is the fully-qualified name of the QueryService's ListLaws RPC.
@@ -62,6 +65,7 @@ var (
 	queryServiceGetMeetingMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("GetMeeting")
 	queryServiceListMeetingsMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListMeetings")
 	queryServiceGetVoteEventMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("GetVoteEvent")
+	queryServiceListVoteEventsMethodDescriptor      = queryServiceServiceDescriptor.Methods().ByName("ListVoteEvents")
 	queryServiceGetLawMethodDescriptor              = queryServiceServiceDescriptor.Methods().ByName("GetLaw")
 	queryServiceListLawsMethodDescriptor            = queryServiceServiceDescriptor.Methods().ByName("ListLaws")
 	queryServiceGetLawChangesMethodDescriptor       = queryServiceServiceDescriptor.Methods().ByName("GetLawChanges")
@@ -74,6 +78,11 @@ type QueryServiceClient interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
 	ListMeetings(context.Context, *connect.Request[v1.ListMeetingsRequest]) (*connect.Response[v1.ListMeetingsResponse], error)
 	GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error)
+	// ── 現会期の記名投票一覧（選挙区投票地図のセレクタ; ADR-000008）──────────────
+	// Vote events in a Diet session that carry per-person 記名投票 records — i.e. the
+	// motions renderable on the district vote map. The map is the current lens; the
+	// immutable log / ListTimeline keeps the full history (現会期スコープ).
+	ListVoteEvents(context.Context, *connect.Request[v1.ListVoteEventsRequest]) (*connect.Response[v1.ListVoteEventsResponse], error)
 	// e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
 	// so full text is served freely with attribution (ADR-000005, source seed comment).
 	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
@@ -121,6 +130,12 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceGetVoteEventMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listVoteEvents: connect.NewClient[v1.ListVoteEventsRequest, v1.ListVoteEventsResponse](
+			httpClient,
+			baseURL+QueryServiceListVoteEventsProcedure,
+			connect.WithSchema(queryServiceListVoteEventsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		getLaw: connect.NewClient[v1.GetLawRequest, v1.GetLawResponse](
 			httpClient,
 			baseURL+QueryServiceGetLawProcedure,
@@ -159,6 +174,7 @@ type queryServiceClient struct {
 	getMeeting          *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
 	listMeetings        *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
 	getVoteEvent        *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
+	listVoteEvents      *connect.Client[v1.ListVoteEventsRequest, v1.ListVoteEventsResponse]
 	getLaw              *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
 	listLaws            *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
 	getLawChanges       *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
@@ -179,6 +195,11 @@ func (c *queryServiceClient) ListMeetings(ctx context.Context, req *connect.Requ
 // GetVoteEvent calls s4rciv.query.v1.QueryService.GetVoteEvent.
 func (c *queryServiceClient) GetVoteEvent(ctx context.Context, req *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error) {
 	return c.getVoteEvent.CallUnary(ctx, req)
+}
+
+// ListVoteEvents calls s4rciv.query.v1.QueryService.ListVoteEvents.
+func (c *queryServiceClient) ListVoteEvents(ctx context.Context, req *connect.Request[v1.ListVoteEventsRequest]) (*connect.Response[v1.ListVoteEventsResponse], error) {
+	return c.listVoteEvents.CallUnary(ctx, req)
 }
 
 // GetLaw calls s4rciv.query.v1.QueryService.GetLaw.
@@ -211,6 +232,11 @@ type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
 	ListMeetings(context.Context, *connect.Request[v1.ListMeetingsRequest]) (*connect.Response[v1.ListMeetingsResponse], error)
 	GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error)
+	// ── 現会期の記名投票一覧（選挙区投票地図のセレクタ; ADR-000008）──────────────
+	// Vote events in a Diet session that carry per-person 記名投票 records — i.e. the
+	// motions renderable on the district vote map. The map is the current lens; the
+	// immutable log / ListTimeline keeps the full history (現会期スコープ).
+	ListVoteEvents(context.Context, *connect.Request[v1.ListVoteEventsRequest]) (*connect.Response[v1.ListVoteEventsResponse], error)
 	// e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
 	// so full text is served freely with attribution (ADR-000005, source seed comment).
 	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
@@ -254,6 +280,12 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceGetVoteEventMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceListVoteEventsHandler := connect.NewUnaryHandler(
+		QueryServiceListVoteEventsProcedure,
+		svc.ListVoteEvents,
+		connect.WithSchema(queryServiceListVoteEventsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	queryServiceGetLawHandler := connect.NewUnaryHandler(
 		QueryServiceGetLawProcedure,
 		svc.GetLaw,
@@ -292,6 +324,8 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceListMeetingsHandler.ServeHTTP(w, r)
 		case QueryServiceGetVoteEventProcedure:
 			queryServiceGetVoteEventHandler.ServeHTTP(w, r)
+		case QueryServiceListVoteEventsProcedure:
+			queryServiceListVoteEventsHandler.ServeHTTP(w, r)
 		case QueryServiceGetLawProcedure:
 			queryServiceGetLawHandler.ServeHTTP(w, r)
 		case QueryServiceListLawsProcedure:
@@ -321,6 +355,10 @@ func (UnimplementedQueryServiceHandler) ListMeetings(context.Context, *connect.R
 
 func (UnimplementedQueryServiceHandler) GetVoteEvent(context.Context, *connect.Request[v1.GetVoteEventRequest]) (*connect.Response[v1.GetVoteEventResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetVoteEvent is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListVoteEvents(context.Context, *connect.Request[v1.ListVoteEventsRequest]) (*connect.Response[v1.ListVoteEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListVoteEvents is not implemented"))
 }
 
 func (UnimplementedQueryServiceHandler) GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error) {

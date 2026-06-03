@@ -89,6 +89,7 @@ message Vote {
   string district_code = 6; // 国土数値情報-aligned district code; "" when is_pr
   bool is_pr = 7; // 比例選出 — no district; shown in the companion panel, never erased (§5)
   string pr_block = 8; // 比例 block (衆: 11 blocks, 参: 全国) when is_pr
+  string parliamentary_group = 9; // 会派 (from the roster) — labels the 比例 companion panel
 }
 
 message VoteEvent {

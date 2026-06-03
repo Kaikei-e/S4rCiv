@@ -80,6 +80,52 @@ func (h *Handler) GetVoteEvent(ctx context.Context, req *connect.Request[queryv1
 	return connect.NewResponse(&queryv1.GetVoteEventResponse{VoteEvent: toVoteEvent(v)}), nil
 }
 
+func (h *Handler) ListVoteEvents(ctx context.Context, req *connect.Request[queryv1.ListVoteEventsRequest]) (*connect.Response[queryv1.ListVoteEventsResponse], error) {
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := parseOffset(req.Msg.GetPageToken())
+	f := port.VoteEventFilter{
+		Session:      int(req.Msg.GetSession()),
+		House:        req.Msg.GetHouse(),
+		MappableOnly: req.Msg.GetMappableOnly(),
+		Limit:        limit + 1, // over-fetch to detect a next page
+		Offset:       offset,
+	}
+	session, items, err := h.reader.ListVoteEvents(ctx, f)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.ListVoteEventsResponse{Session: int32(session)}
+	if len(items) > limit {
+		out.NextPageToken = strconv.Itoa(offset + limit)
+		items = items[:limit]
+	}
+	for _, s := range items {
+		out.VoteEvents = append(out.VoteEvents, toVoteEventSummary(s))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func toVoteEventSummary(s port.VoteEventSummaryView) *queryv1.VoteEventSummary {
+	return &queryv1.VoteEventSummary{
+		VoteEventId:   s.VoteEventID,
+		IssueId:       s.IssueID,
+		Session:       int32(s.Session),
+		House:         s.House,
+		MeetingName:   s.MeetingName,
+		Motion:        s.Motion,
+		Date:          s.Date,
+		Result:        s.Result,
+		YesCount:      int32(s.YesCount),
+		NoCount:       int32(s.NoCount),
+		AbstainCount:  int32(s.AbstainCount),
+		HasNamedVotes: s.HasNamedVotes,
+		Attribution:   toAttribution(s.Attr),
+	}
+}
+
 func (h *Handler) GetLaw(ctx context.Context, req *connect.Request[queryv1.GetLawRequest]) (*connect.Response[queryv1.GetLawResponse], error) {
 	id := req.Msg.GetLawId()
 	if id == "" {
@@ -349,10 +395,15 @@ func toVoteEvent(v port.VoteEventView) *queryv1.VoteEvent {
 	}
 	for _, vt := range v.Event.Votes {
 		out.Votes = append(out.Votes, &queryv1.Vote{
-			Option:     vt.Option,
-			VoterName:  vt.VoterName,
-			PersonId:   vt.PersonID,
-			Confidence: vt.Confidence,
+			Option:             vt.Option,
+			VoterName:          vt.VoterName,
+			PersonId:           vt.PersonID,
+			Confidence:         vt.Confidence,
+			House:              vt.House,
+			DistrictCode:       vt.DistrictCode,
+			IsPr:               vt.IsPR,
+			PrBlock:            vt.PRBlock,
+			ParliamentaryGroup: vt.Group,
 		})
 	}
 	return out

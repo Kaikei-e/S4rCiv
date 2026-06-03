@@ -74,6 +74,35 @@ type VoteEventView struct {
 	Attr  Attribution
 }
 
+// VoteEventFilter is the current-session 記名投票 query backing the district-vote-map
+// selector (ADR-000008). The map is a present-tense lens (現会期スコープ): Session 0
+// resolves to the latest observed session.
+type VoteEventFilter struct {
+	Session      int    // 0 = current (latest observed session)
+	House        string // "" = both
+	MappableOnly bool   // true = only events that carry per-person 記名投票 records
+	Limit        int
+	Offset       int
+}
+
+// VoteEventSummaryView is one 記名投票 summary for the map selector: counts only,
+// with the meeting context (never a bare option; §7).
+type VoteEventSummaryView struct {
+	VoteEventID   string
+	IssueID       string
+	Session       int
+	House         string
+	MeetingName   string
+	Motion        string
+	Date          string
+	Result        string
+	YesCount      int
+	NoCount       int
+	AbstainCount  int
+	HasNamedVotes bool // per-person records exist → renderable on the map
+	Attr          Attribution
+}
+
 // LegislatorVoteView is one named vote by a legislator, carrying the motion +
 // meeting context (never a bare option; DISCIPLINE §7).
 type LegislatorVoteView struct {
@@ -104,6 +133,10 @@ type QueryReader interface {
 	Meeting(ctx context.Context, issueID string) (MeetingView, []SpeechView, bool, error)
 	ListMeetings(ctx context.Context, session int, house string, limit, offset int) ([]MeetingView, error)
 	VoteEvent(ctx context.Context, voteEventID string) (VoteEventView, bool, error)
+	// ListVoteEvents serves the district-vote-map selector (ADR-000008). It returns
+	// the resolved session (echoing the latest when the filter asked for 0) and the
+	// 記名投票 summaries for it.
+	ListVoteEvents(ctx context.Context, f VoteEventFilter) (int, []VoteEventSummaryView, error)
 	ListTimeline(ctx context.Context, f TimelineFilter) ([]TimelineItemView, error)
 	VotesByPerson(ctx context.Context, personID string, limit, offset int) (LegislatorVotes, bool, error)
 }

@@ -44,6 +44,15 @@ type StoredVote struct {
 	VoterName  string
 	PersonID   string // empty when unresolved
 	Confidence string
+	// District binding for the district vote map (ADR-000008), filled at READ TIME
+	// by left-joining interpretation.legislator_district on PersonID — never stored
+	// on the vote row (read-model independence). All empty when the person is
+	// unresolved or absent from the current roster (現会期 → rendered as 記録なし).
+	House        string
+	DistrictCode string // 国土数値情報-aligned; empty when IsPR
+	IsPR         bool   // 比例選出 — shown in the companion panel, never erased (§5)
+	PRBlock      string
+	Group        string // 会派 (from the roster) — labels the 比例 companion panel
 }
 
 type StoredVoteEvent struct {
@@ -79,4 +88,29 @@ type ProjectionBatch struct {
 type ReadModelStore interface {
 	ApplyMeeting(ctx context.Context, b ProjectionBatch) error
 	Truncate(ctx context.Context) error
+}
+
+// ── giin-roster (legislator -> electoral district) projection (ADR-000008) ──────
+
+// RosterNormalizer is the anti-corruption parse from a roster page snapshot to the
+// legislator->district binding. Pure with respect to a snapshot, so projection
+// stays reproject-safe.
+type RosterNormalizer interface {
+	ParseRoster(content []byte) ([]leg.RosterEntry, error)
+}
+
+// RosterProjectionBatch is the legislator_district rows derived from one roster-page
+// snapshot. The store replaces that page's rows (by StreamID) in one transaction, so
+// a member dropped from the page on re-observation is removed (reproject-safe).
+type RosterProjectionBatch struct {
+	StreamID       string
+	Entries        []leg.RosterEntry
+	ObservationSeq int64
+	ObservedAt     time.Time
+}
+
+// RosterReadModelStore writes the disposable legislator_district read model.
+type RosterReadModelStore interface {
+	ApplyRoster(ctx context.Context, b RosterProjectionBatch) error
+	TruncateRoster(ctx context.Context) error
 }
