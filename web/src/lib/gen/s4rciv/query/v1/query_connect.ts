@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListTimelineRequest, ListTimelineResponse } from "./query_pb.js";
+import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -43,6 +43,20 @@ export const QueryService = {
       name: "GetVoteEvent",
       I: GetVoteEventRequest,
       O: GetVoteEventResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ── 現会期の記名投票一覧（選挙区投票地図のセレクタ; ADR-000008）──────────────
+     * Vote events in a Diet session that carry per-person 記名投票 records — i.e. the
+     * motions renderable on the district vote map. The map is the current lens; the
+     * immutable log / ListTimeline keeps the full history (現会期スコープ).
+     *
+     * @generated from rpc s4rciv.query.v1.QueryService.ListVoteEvents
+     */
+    listVoteEvents: {
+      name: "ListVoteEvents",
+      I: ListVoteEventsRequest,
+      O: ListVoteEventsResponse,
       kind: MethodKind.Unary,
     },
     /**

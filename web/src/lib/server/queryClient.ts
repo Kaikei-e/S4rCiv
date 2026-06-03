@@ -18,7 +18,9 @@ import type {
 	GetLawResponse,
 	GetLawChangesResponse,
 	GetMeetingResponse,
-	ListLegislatorVotesResponse
+	ListLegislatorVotesResponse,
+	GetVoteEventResponse,
+	ListVoteEventsResponse
 } from '$lib/types';
 
 const BASE = (env.API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
@@ -53,5 +55,16 @@ export async function listLegislatorVotes(
 ): Promise<ListLegislatorVotesResponse> {
 	return json<ListLegislatorVotesResponse>(
 		await client.listLegislatorVotes({ personId, pageSize: 100 })
+	);
+}
+
+export async function getVoteEvent(voteEventId: string): Promise<GetVoteEventResponse> {
+	return json<GetVoteEventResponse>(await client.getVoteEvent({ voteEventId }));
+}
+
+// 現会期 (session 0 = latest) の記名投票だけを地図セレクタ用に返す (ADR-000008).
+export async function listVoteEvents(session = 0): Promise<ListVoteEventsResponse> {
+	return json<ListVoteEventsResponse>(
+		await client.listVoteEvents({ session, mappableOnly: true, pageSize: 100 })
 	);
 }

@@ -160,3 +160,59 @@ export interface ListLegislatorVotesResponse {
 	votes?: LegislatorVote[];
 	nextPageToken?: string;
 }
+
+// ── 選挙区投票地図 (district vote map; ADR-000008) ────────────────────────────────
+
+export interface Vote {
+	option?: string; // yes | no | abstain
+	voterName?: string;
+	personId?: string;
+	confidence?: string;
+	house?: string; // 衆議院 | 参議院 (from the roster, read-time join)
+	districtCode?: string; // == GeoJSON kucode; "" when isPr
+	isPr?: boolean; // 比例選出 — shown in the companion panel, never erased (§5)
+	prBlock?: string;
+	parliamentaryGroup?: string; // 会派
+}
+
+export interface VoteEvent {
+	voteEventId?: string;
+	issueId?: string;
+	motion?: string;
+	yesCount?: number;
+	noCount?: number;
+	abstainCount?: number;
+	result?: string;
+	confidence?: string;
+	needsReview?: boolean;
+	extractorVersion?: string;
+	sourceSpeechId?: string;
+	votes?: Vote[];
+	attribution?: Attribution;
+}
+
+export interface GetVoteEventResponse {
+	voteEvent?: VoteEvent;
+}
+
+export interface VoteEventSummary {
+	voteEventId?: string;
+	issueId?: string;
+	session?: number;
+	house?: string;
+	meetingName?: string;
+	motion?: string;
+	date?: string;
+	result?: string;
+	yesCount?: number;
+	noCount?: number;
+	abstainCount?: number;
+	hasNamedVotes?: boolean;
+	attribution?: Attribution;
+}
+
+export interface ListVoteEventsResponse {
+	session?: number;
+	voteEvents?: VoteEventSummary[];
+	nextPageToken?: string;
+}

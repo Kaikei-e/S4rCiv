@@ -35,7 +35,10 @@
 		<span class="dot" aria-hidden="true">◉</span>
 		<h1>S4rCiv <span class="label">公的記録の司令室</span></h1>
 	</div>
-	<a class="feed" href={feedHref} title="この絞り込みの Atom フィードを購読（ウォッチ）">📡 RSS</a>
+	<nav class="topnav">
+		<a class="navlink" href="/votes" title="記名投票を選挙区別に地図で見る">🗺 選挙区投票地図</a>
+		<a class="feed" href={feedHref} title="この絞り込みの Atom フィードを購読（ウォッチ）">📡 RSS</a>
+	</nav>
 </header>
 
 <main id="main" class="wrap">
@@ -128,15 +131,23 @@
 		align-items: baseline;
 		gap: 10px;
 	}
-	.feed {
+	.topnav {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.feed,
+	.navlink {
 		font-size: 12px;
 		padding: 4px 10px;
 		border: 1px solid var(--hairline-2);
 		border-radius: var(--r-sm);
 		text-decoration: none;
 		color: var(--text-2);
+		white-space: nowrap;
 	}
-	.feed:hover {
+	.feed:hover,
+	.navlink:hover {
 		color: var(--accent);
 		border-color: var(--accent);
 	}
