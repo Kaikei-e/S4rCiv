@@ -6,7 +6,7 @@ INSERT INTO control.source (source, base_url, rate_limit_ms, user_agent, robots_
 VALUES (
   'kokkai',
   'https://kokkai.ndl.go.jp/api',
-  3000,
+  5000,
   'S4rCiv-collect/0.1.0 (+mailto:contact@example.org)',
   '{"respect": true, "source_of_truth": "live"}'::jsonb,
   true
