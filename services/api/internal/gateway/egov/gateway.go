@@ -228,11 +228,33 @@ func (g *Gateway) updatedOn(ctx context.Context, d time.Time) ([]string, error) 
 	return ids, nil
 }
 
-// decodeUpdateList accepts either a bare array of entries or an object wrapping
-// them under a list key, tolerating the v1/v2 envelope difference.
+// decodeUpdateList tolerates the formats e-Gov actually serves for the updated-law
+// list. The v2 host has no updatelawlists endpoint (404), so the live path is the
+// v1 fallback, which serves text/xml: DataRoot > ApplData > LawNameListInfo[]. JSON
+// shapes are kept for forward-compat if v2 ever ships a JSON updated-law list.
 func decodeUpdateList(body []byte) ([]updateLawEntry, error) {
 	trimmed := bytes.TrimSpace(body)
-	if len(trimmed) > 0 && trimmed[0] == '[' {
+	if len(trimmed) == 0 {
+		return nil, nil
+	}
+	if trimmed[0] == '<' { // v1 XML (the live path)
+		var doc struct {
+			Entries []struct {
+				LawID          string `xml:"LawId"`
+				EnforcementFlg string `xml:"EnforcementFlg"`
+				AuthFlg        string `xml:"AuthFlg"`
+			} `xml:"ApplData>LawNameListInfo"`
+		}
+		if err := xml.Unmarshal(trimmed, &doc); err != nil {
+			return nil, err
+		}
+		out := make([]updateLawEntry, 0, len(doc.Entries))
+		for _, e := range doc.Entries {
+			out = append(out, updateLawEntry{LawID: e.LawID, EnforcementFlg: e.EnforcementFlg, AuthFlg: e.AuthFlg})
+		}
+		return out, nil
+	}
+	if trimmed[0] == '[' {
 		var arr []updateLawEntry
 		if err := json.Unmarshal(trimmed, &arr); err != nil {
 			return nil, err

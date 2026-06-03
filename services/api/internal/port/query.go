@@ -15,6 +15,48 @@ type Attribution struct {
 	FetchedAt      time.Time
 	ObservationSeq int64
 	WasOCR         bool
+	// Global log-chain linkage of the backing event (hex sha256). Populated by the
+	// timeline reader (which joins observation.event); empty for readers that do not.
+	// Shown as chain linkage with a "(未検証)" label — not a verification result
+	// (ADR-000007 / E1).
+	LogHash     string
+	PrevLogHash string
+}
+
+// TimelineFilter is the cross-source timeline query (ADR-000006). Filters are
+// mechanical and source-agnostic; there is deliberately no person axis.
+type TimelineFilter struct {
+	Source         string // "" = all
+	EventType      string // "" = all (ResourceObserved | ResourceChanged | ...)
+	Classification string // "" = all (administrative | substantive)
+	Since          string // RFC3339, observed_at >= since; "" = open
+	Until          string // RFC3339, observed_at < until; "" = open
+	Keyword        string // structured-field match (title/subtitle); never speech text
+	Limit          int
+	CursorSeq      int64 // keyset cursor; 0 = first page (no upper bound)
+}
+
+// TimelineItemView is one read-time-composed timeline row: the observation event
+// (spine) enriched from the interpretation read models (body).
+type TimelineItemView struct {
+	Seq                 int64
+	EventType           string
+	Source              string
+	StreamID            string
+	ObservedAt          time.Time
+	SourcePublishedAt   *time.Time
+	Title               string
+	Subtitle            string
+	IssueID             string
+	LawID               string
+	FeaturedVoteEventID string
+	Classification      string
+	ClassConfidence     string
+	NodesAdded          int
+	NodesDeleted        int
+	NodesModified       int
+	WasOCR              bool
+	Attr                Attribution
 }
 
 type MeetingView struct {
@@ -32,9 +74,36 @@ type VoteEventView struct {
 	Attr  Attribution
 }
 
+// LegislatorVoteView is one named vote by a legislator, carrying the motion +
+// meeting context (never a bare option; DISCIPLINE §7).
+type LegislatorVoteView struct {
+	VoteEventID string
+	IssueID     string
+	Motion      string
+	Option      string
+	Result      string
+	MeetingName string
+	House       string
+	Date        string
+	Confidence  string
+	Attr        Attribution
+}
+
+// LegislatorVotes is a legislator's named-vote record (ADR-000006). Compiled only
+// for a high-confidence identity; otherwise Votes is empty and IdentityConfidence
+// tells the UI a possible homonym is not merged.
+type LegislatorVotes struct {
+	PersonID           string
+	PersonName         string
+	IdentityConfidence string
+	Votes              []LegislatorVoteView
+}
+
 // QueryReader is the read-only view over the interpretation read models.
 type QueryReader interface {
 	Meeting(ctx context.Context, issueID string) (MeetingView, []SpeechView, bool, error)
 	ListMeetings(ctx context.Context, session int, house string, limit, offset int) ([]MeetingView, error)
 	VoteEvent(ctx context.Context, voteEventID string) (VoteEventView, bool, error)
+	ListTimeline(ctx context.Context, f TimelineFilter) ([]TimelineItemView, error)
+	VotesByPerson(ctx context.Context, personID string, limit, offset int) (LegislatorVotes, bool, error)
 }

@@ -147,6 +147,111 @@ func (h *Handler) GetLawChanges(ctx context.Context, req *connect.Request[queryv
 	return connect.NewResponse(out), nil
 }
 
+func (h *Handler) ListTimeline(ctx context.Context, req *connect.Request[queryv1.ListTimelineRequest]) (*connect.Response[queryv1.ListTimelineResponse], error) {
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	f := port.TimelineFilter{
+		Source:         req.Msg.GetSource(),
+		EventType:      req.Msg.GetEventType(),
+		Classification: req.Msg.GetClassification(),
+		Since:          req.Msg.GetSince(),
+		Until:          req.Msg.GetUntil(),
+		Keyword:        req.Msg.GetKeyword(),
+		CursorSeq:      parseSeqToken(req.Msg.GetPageToken()),
+		Limit:          limit + 1, // keyset over-fetch to detect a next page
+	}
+	items, err := h.reader.ListTimeline(ctx, f)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.ListTimelineResponse{}
+	if len(items) > limit { // next page starts below the last returned seq
+		out.NextPageToken = strconv.FormatInt(items[limit-1].Seq, 10)
+		items = items[:limit]
+	}
+	for _, it := range items {
+		out.Items = append(out.Items, toTimelineItem(it))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func toTimelineItem(v port.TimelineItemView) *queryv1.TimelineItem {
+	out := &queryv1.TimelineItem{
+		Seq:                 v.Seq,
+		EventType:           v.EventType,
+		Source:              v.Source,
+		StreamId:            v.StreamID,
+		ObservedAt:          v.ObservedAt.UTC().Format(time.RFC3339),
+		Title:               v.Title,
+		Subtitle:            v.Subtitle,
+		IssueId:             v.IssueID,
+		LawId:               v.LawID,
+		FeaturedVoteEventId: v.FeaturedVoteEventID,
+		Classification:      v.Classification,
+		ClassConfidence:     v.ClassConfidence,
+		NodesAdded:          int32(v.NodesAdded),
+		NodesDeleted:        int32(v.NodesDeleted),
+		NodesModified:       int32(v.NodesModified),
+		WasOcr:              v.WasOCR,
+		Attribution:         toAttribution(v.Attr),
+	}
+	if v.SourcePublishedAt != nil {
+		out.SourcePublishedAt = v.SourcePublishedAt.UTC().Format(time.RFC3339)
+	}
+	return out
+}
+
+func (h *Handler) ListLegislatorVotes(ctx context.Context, req *connect.Request[queryv1.ListLegislatorVotesRequest]) (*connect.Response[queryv1.ListLegislatorVotesResponse], error) {
+	id := req.Msg.GetPersonId()
+	if id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("person_id is required"))
+	}
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := parseOffset(req.Msg.GetPageToken())
+
+	lv, found, err := h.reader.VotesByPerson(ctx, id, limit+1, offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("person %s not found", id))
+	}
+	out := &queryv1.ListLegislatorVotesResponse{
+		PersonId:           lv.PersonID,
+		PersonName:         lv.PersonName,
+		IdentityConfidence: lv.IdentityConfidence,
+	}
+	votes := lv.Votes
+	if len(votes) > limit {
+		out.NextPageToken = strconv.Itoa(offset + limit)
+		votes = votes[:limit]
+	}
+	for _, v := range votes {
+		out.Votes = append(out.Votes, toLegislatorVote(v))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func toLegislatorVote(v port.LegislatorVoteView) *queryv1.LegislatorVote {
+	return &queryv1.LegislatorVote{
+		VoteEventId: v.VoteEventID,
+		IssueId:     v.IssueID,
+		Motion:      v.Motion,
+		Option:      v.Option,
+		Result:      v.Result,
+		MeetingName: v.MeetingName,
+		House:       v.House,
+		Date:        v.Date,
+		Confidence:  v.Confidence,
+		Attribution: toAttribution(v.Attr),
+	}
+}
+
 func toLaw(lv port.LawView) *queryv1.Law {
 	return &queryv1.Law{
 		LawId:                    lv.Law.LawID,
@@ -194,6 +299,8 @@ func toLawChange(c port.LawChangeView) *queryv1.LawChange {
 			Op:       nc.Op,
 			NodeType: nc.NodeType,
 			Num:      nc.Num,
+			PrevText: nc.PrevText,
+			CurrText: nc.CurrText,
 		})
 	}
 	return out
@@ -258,7 +365,20 @@ func toAttribution(a port.Attribution) *queryv1.Attribution {
 		FetchedAt:      a.FetchedAt.UTC().Format(time.RFC3339),
 		ObservationSeq: a.ObservationSeq,
 		WasOcr:         a.WasOCR,
+		LogHash:        a.LogHash,
+		PrevLogHash:    a.PrevLogHash,
 	}
+}
+
+func parseSeqToken(token string) int64 {
+	if token == "" {
+		return 0
+	}
+	n, err := strconv.ParseInt(token, 10, 64)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 func parseOffset(token string) int {

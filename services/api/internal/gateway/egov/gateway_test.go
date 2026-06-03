@@ -173,8 +173,17 @@ func TestListUpdatedFiltersByEnforcement(t *testing.T) {
 }
 
 func TestListUpdatedV1Fallback(t *testing.T) {
-	body, _ := json.Marshal([]map[string]any{{"LawId": "B9", "EnforcementFlg": "0"}})
-	// v2 endpoint 404s (not in bodies); v1 absolute URL serves the list.
+	// v2 has no updatelawlists endpoint (404); the v1 fallback serves text/xml:
+	// DataRoot > ApplData > LawNameListInfo[]. This is the live path in production.
+	body := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<DataRoot>
+  <Result><Code>0</Code><Message/></Result>
+  <ApplData>
+    <Date>20240401</Date>
+    <LawNameListInfo><LawId>B9</LawId><EnforcementFlg>0</EnforcementFlg><AuthFlg>0</AuthFlg></LawNameListInfo>
+    <LawNameListInfo><LawId>B8</LawId><EnforcementFlg>1</EnforcementFlg></LawNameListInfo>
+  </ApplData>
+</DataRoot>`)
 	g := New(fakeGetter{
 		bodies: map[string][]byte{},
 		abs: map[string][]byte{
@@ -185,7 +194,8 @@ func TestListUpdatedV1Fallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUpdated: %v", err)
 	}
+	// B8 is 未施行 (EnforcementFlg=1) and must be filtered out, leaving B9.
 	if len(refs) != 1 || refs[0].SourceLocalKey != "B9" {
-		t.Fatalf("v1 fallback refs = %+v", refs)
+		t.Fatalf("v1 XML fallback refs = %+v", refs)
 	}
 }

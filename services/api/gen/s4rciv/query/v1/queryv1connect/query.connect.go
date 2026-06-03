@@ -48,6 +48,25 @@ const (
 	// QueryServiceGetLawChangesProcedure is the fully-qualified name of the QueryService's
 	// GetLawChanges RPC.
 	QueryServiceGetLawChangesProcedure = "/s4rciv.query.v1.QueryService/GetLawChanges"
+	// QueryServiceListTimelineProcedure is the fully-qualified name of the QueryService's ListTimeline
+	// RPC.
+	QueryServiceListTimelineProcedure = "/s4rciv.query.v1.QueryService/ListTimeline"
+	// QueryServiceListLegislatorVotesProcedure is the fully-qualified name of the QueryService's
+	// ListLegislatorVotes RPC.
+	QueryServiceListLegislatorVotesProcedure = "/s4rciv.query.v1.QueryService/ListLegislatorVotes"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	queryServiceServiceDescriptor                   = v1.File_s4rciv_query_v1_query_proto.Services().ByName("QueryService")
+	queryServiceGetMeetingMethodDescriptor          = queryServiceServiceDescriptor.Methods().ByName("GetMeeting")
+	queryServiceListMeetingsMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListMeetings")
+	queryServiceGetVoteEventMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("GetVoteEvent")
+	queryServiceGetLawMethodDescriptor              = queryServiceServiceDescriptor.Methods().ByName("GetLaw")
+	queryServiceListLawsMethodDescriptor            = queryServiceServiceDescriptor.Methods().ByName("ListLaws")
+	queryServiceGetLawChangesMethodDescriptor       = queryServiceServiceDescriptor.Methods().ByName("GetLawChanges")
+	queryServiceListTimelineMethodDescriptor        = queryServiceServiceDescriptor.Methods().ByName("ListTimeline")
+	queryServiceListLegislatorVotesMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -60,6 +79,18 @@ type QueryServiceClient interface {
 	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
 	ListLaws(context.Context, *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error)
 	GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error)
+	// ── Cross-source timeline (the dashboard spine; ADR-000006) ─────────────────
+	// One item per observation.event (status = event type), enriched from the
+	// interpretation read models at read time. There is deliberately NO person
+	// axis (anti-doxxing, ADR-000004/000006), and diff content is never inlined
+	// here (§7) — only structural change counts. Ordered by global seq desc;
+	// keyset pagination over seq.
+	ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error)
+	// ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
+	// A legislator's named-vote history: factual records of an accountable public
+	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
+	// This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
+	ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error)
 }
 
 // NewQueryServiceClient constructs a client for the s4rciv.query.v1.QueryService service. By
@@ -71,42 +102,53 @@ type QueryServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) QueryServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	queryServiceMethods := v1.File_s4rciv_query_v1_query_proto.Services().ByName("QueryService").Methods()
 	return &queryServiceClient{
 		getMeeting: connect.NewClient[v1.GetMeetingRequest, v1.GetMeetingResponse](
 			httpClient,
 			baseURL+QueryServiceGetMeetingProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("GetMeeting")),
+			connect.WithSchema(queryServiceGetMeetingMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		listMeetings: connect.NewClient[v1.ListMeetingsRequest, v1.ListMeetingsResponse](
 			httpClient,
 			baseURL+QueryServiceListMeetingsProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("ListMeetings")),
+			connect.WithSchema(queryServiceListMeetingsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getVoteEvent: connect.NewClient[v1.GetVoteEventRequest, v1.GetVoteEventResponse](
 			httpClient,
 			baseURL+QueryServiceGetVoteEventProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("GetVoteEvent")),
+			connect.WithSchema(queryServiceGetVoteEventMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getLaw: connect.NewClient[v1.GetLawRequest, v1.GetLawResponse](
 			httpClient,
 			baseURL+QueryServiceGetLawProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("GetLaw")),
+			connect.WithSchema(queryServiceGetLawMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		listLaws: connect.NewClient[v1.ListLawsRequest, v1.ListLawsResponse](
 			httpClient,
 			baseURL+QueryServiceListLawsProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("ListLaws")),
+			connect.WithSchema(queryServiceListLawsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		getLawChanges: connect.NewClient[v1.GetLawChangesRequest, v1.GetLawChangesResponse](
 			httpClient,
 			baseURL+QueryServiceGetLawChangesProcedure,
-			connect.WithSchema(queryServiceMethods.ByName("GetLawChanges")),
+			connect.WithSchema(queryServiceGetLawChangesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listTimeline: connect.NewClient[v1.ListTimelineRequest, v1.ListTimelineResponse](
+			httpClient,
+			baseURL+QueryServiceListTimelineProcedure,
+			connect.WithSchema(queryServiceListTimelineMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listLegislatorVotes: connect.NewClient[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse](
+			httpClient,
+			baseURL+QueryServiceListLegislatorVotesProcedure,
+			connect.WithSchema(queryServiceListLegislatorVotesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -114,12 +156,14 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 
 // queryServiceClient implements QueryServiceClient.
 type queryServiceClient struct {
-	getMeeting    *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
-	listMeetings  *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
-	getVoteEvent  *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
-	getLaw        *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
-	listLaws      *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
-	getLawChanges *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
+	getMeeting          *connect.Client[v1.GetMeetingRequest, v1.GetMeetingResponse]
+	listMeetings        *connect.Client[v1.ListMeetingsRequest, v1.ListMeetingsResponse]
+	getVoteEvent        *connect.Client[v1.GetVoteEventRequest, v1.GetVoteEventResponse]
+	getLaw              *connect.Client[v1.GetLawRequest, v1.GetLawResponse]
+	listLaws            *connect.Client[v1.ListLawsRequest, v1.ListLawsResponse]
+	getLawChanges       *connect.Client[v1.GetLawChangesRequest, v1.GetLawChangesResponse]
+	listTimeline        *connect.Client[v1.ListTimelineRequest, v1.ListTimelineResponse]
+	listLegislatorVotes *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -152,6 +196,16 @@ func (c *queryServiceClient) GetLawChanges(ctx context.Context, req *connect.Req
 	return c.getLawChanges.CallUnary(ctx, req)
 }
 
+// ListTimeline calls s4rciv.query.v1.QueryService.ListTimeline.
+func (c *queryServiceClient) ListTimeline(ctx context.Context, req *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error) {
+	return c.listTimeline.CallUnary(ctx, req)
+}
+
+// ListLegislatorVotes calls s4rciv.query.v1.QueryService.ListLegislatorVotes.
+func (c *queryServiceClient) ListLegislatorVotes(ctx context.Context, req *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error) {
+	return c.listLegislatorVotes.CallUnary(ctx, req)
+}
+
 // QueryServiceHandler is an implementation of the s4rciv.query.v1.QueryService service.
 type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
@@ -162,6 +216,18 @@ type QueryServiceHandler interface {
 	GetLaw(context.Context, *connect.Request[v1.GetLawRequest]) (*connect.Response[v1.GetLawResponse], error)
 	ListLaws(context.Context, *connect.Request[v1.ListLawsRequest]) (*connect.Response[v1.ListLawsResponse], error)
 	GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error)
+	// ── Cross-source timeline (the dashboard spine; ADR-000006) ─────────────────
+	// One item per observation.event (status = event type), enriched from the
+	// interpretation read models at read time. There is deliberately NO person
+	// axis (anti-doxxing, ADR-000004/000006), and diff content is never inlined
+	// here (§7) — only structural change counts. Ordered by global seq desc;
+	// keyset pagination over seq.
+	ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error)
+	// ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
+	// A legislator's named-vote history: factual records of an accountable public
+	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
+	// This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
+	ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error)
 }
 
 // NewQueryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -170,41 +236,52 @@ type QueryServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	queryServiceMethods := v1.File_s4rciv_query_v1_query_proto.Services().ByName("QueryService").Methods()
 	queryServiceGetMeetingHandler := connect.NewUnaryHandler(
 		QueryServiceGetMeetingProcedure,
 		svc.GetMeeting,
-		connect.WithSchema(queryServiceMethods.ByName("GetMeeting")),
+		connect.WithSchema(queryServiceGetMeetingMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	queryServiceListMeetingsHandler := connect.NewUnaryHandler(
 		QueryServiceListMeetingsProcedure,
 		svc.ListMeetings,
-		connect.WithSchema(queryServiceMethods.ByName("ListMeetings")),
+		connect.WithSchema(queryServiceListMeetingsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	queryServiceGetVoteEventHandler := connect.NewUnaryHandler(
 		QueryServiceGetVoteEventProcedure,
 		svc.GetVoteEvent,
-		connect.WithSchema(queryServiceMethods.ByName("GetVoteEvent")),
+		connect.WithSchema(queryServiceGetVoteEventMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	queryServiceGetLawHandler := connect.NewUnaryHandler(
 		QueryServiceGetLawProcedure,
 		svc.GetLaw,
-		connect.WithSchema(queryServiceMethods.ByName("GetLaw")),
+		connect.WithSchema(queryServiceGetLawMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	queryServiceListLawsHandler := connect.NewUnaryHandler(
 		QueryServiceListLawsProcedure,
 		svc.ListLaws,
-		connect.WithSchema(queryServiceMethods.ByName("ListLaws")),
+		connect.WithSchema(queryServiceListLawsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	queryServiceGetLawChangesHandler := connect.NewUnaryHandler(
 		QueryServiceGetLawChangesProcedure,
 		svc.GetLawChanges,
-		connect.WithSchema(queryServiceMethods.ByName("GetLawChanges")),
+		connect.WithSchema(queryServiceGetLawChangesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	queryServiceListTimelineHandler := connect.NewUnaryHandler(
+		QueryServiceListTimelineProcedure,
+		svc.ListTimeline,
+		connect.WithSchema(queryServiceListTimelineMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	queryServiceListLegislatorVotesHandler := connect.NewUnaryHandler(
+		QueryServiceListLegislatorVotesProcedure,
+		svc.ListLegislatorVotes,
+		connect.WithSchema(queryServiceListLegislatorVotesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/s4rciv.query.v1.QueryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +298,10 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceListLawsHandler.ServeHTTP(w, r)
 		case QueryServiceGetLawChangesProcedure:
 			queryServiceGetLawChangesHandler.ServeHTTP(w, r)
+		case QueryServiceListTimelineProcedure:
+			queryServiceListTimelineHandler.ServeHTTP(w, r)
+		case QueryServiceListLegislatorVotesProcedure:
+			queryServiceListLegislatorVotesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -252,4 +333,12 @@ func (UnimplementedQueryServiceHandler) ListLaws(context.Context, *connect.Reque
 
 func (UnimplementedQueryServiceHandler) GetLawChanges(context.Context, *connect.Request[v1.GetLawChangesRequest]) (*connect.Response[v1.GetLawChangesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetLawChanges is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListTimeline(context.Context, *connect.Request[v1.ListTimelineRequest]) (*connect.Response[v1.ListTimelineResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListTimeline is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListLegislatorVotes is not implemented"))
 }

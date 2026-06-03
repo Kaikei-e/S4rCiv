@@ -13,11 +13,28 @@ service QueryService {
   rpc GetMeeting(GetMeetingRequest) returns (GetMeetingResponse);
   rpc ListMeetings(ListMeetingsRequest) returns (ListMeetingsResponse);
   rpc GetVoteEvent(GetVoteEventRequest) returns (GetVoteEventResponse);
+  // ── 現会期の記名投票一覧（選挙区投票地図のセレクタ; ADR-000008）──────────────
+  // Vote events in a Diet session that carry per-person 記名投票 records — i.e. the
+  // motions renderable on the district vote map. The map is the current lens; the
+  // immutable log / ListTimeline keeps the full history (現会期スコープ).
+  rpc ListVoteEvents(ListVoteEventsRequest) returns (ListVoteEventsResponse);
   // e-Gov 法令 (egov-law) read side. Law text is outside copyright (著作権法13条),
   // so full text is served freely with attribution (ADR-000005, source seed comment).
   rpc GetLaw(GetLawRequest) returns (GetLawResponse);
   rpc ListLaws(ListLawsRequest) returns (ListLawsResponse);
   rpc GetLawChanges(GetLawChangesRequest) returns (GetLawChangesResponse);
+  // ── Cross-source timeline (the dashboard spine; ADR-000006) ─────────────────
+  // One item per observation.event (status = event type), enriched from the
+  // interpretation read models at read time. There is deliberately NO person
+  // axis (anti-doxxing, ADR-000004/000006), and diff content is never inlined
+  // here (§7) — only structural change counts. Ordered by global seq desc;
+  // keyset pagination over seq.
+  rpc ListTimeline(ListTimelineRequest) returns (ListTimelineResponse);
+  // ── Per-legislator 記名投票 record (ADR-000006) ──────────────────────────────
+  // A legislator's named-vote history: factual records of an accountable public
+  // actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
+  // This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
+  rpc ListLegislatorVotes(ListLegislatorVotesRequest) returns (ListLegislatorVotesResponse);
 }
 
 // Provenance + source attribution attached to every projected record.
@@ -27,6 +44,12 @@ message Attribution {
   string fetched_at = 3; // RFC3339 UTC, the observed_at of the backing event
   int64 observation_seq = 4; // backing observation.event.seq (provenance)
   bool was_ocr = 5; // low-confidence extraction flag (snapshot.was_ocr)
+  // Global log-chain linkage of the backing event (hex sha256). Shown by the
+  // Provenance chip as "連鎖 #seq ← prev" with a "(未検証)" label: it proves the
+  // chain exists, but is NOT a verification result (real verification is a later
+  // milestone; ADR-000007 / E1). Empty when the reader does not join the event.
+  string log_hash = 6;
+  string prev_log_hash = 7;
 }
 
 message Meeting {
@@ -56,6 +79,16 @@ message Vote {
   string voter_name = 2; // raw extracted name
   string person_id = 3; // Popolo link, empty if unresolved
   string confidence = 4; // "high" | "medium" | "low"
+  // Electoral-district binding for the district vote map (ADR-000008), filled at
+  // READ TIME by joining the giin-roster read model (interpretation.legislator_district)
+  // on person_id. Empty when the person is unresolved or absent from the CURRENT
+  // roster (現会期スコープ): the map renders such votes as 記録なし. Legislators are
+  // accountable public officials, so this geographic binding is not private-person
+  // profiling (DISCIPLINE §4; ADR-000006 "自分の代表がどう投票したか").
+  string house = 5; // 衆議院 | 参議院 (the legislator's house in the roster)
+  string district_code = 6; // 国土数値情報-aligned district code; "" when is_pr
+  bool is_pr = 7; // 比例選出 — no district; shown in the companion panel, never erased (§5)
+  string pr_block = 8; // 比例 block (衆: 11 blocks, 参: 全国) when is_pr
 }
 
 message VoteEvent {
@@ -100,6 +133,40 @@ message GetVoteEventResponse {
   VoteEvent vote_event = 1;
 }
 
+// ── 現会期の記名投票一覧（選挙区投票地図のセレクタ; ADR-000008）────────────────
+
+// A lightweight 記名投票 summary for the district-vote-map selector. Counts only —
+// the per-district options live in GetVoteEvent (Vote.district_code), shown in
+// context (§7). The featured actors are accountable public officials (Diet members).
+message VoteEventSummary {
+  string vote_event_id = 1;
+  string issue_id = 2;
+  int32 session = 3; // 国会回次
+  string house = 4; // 衆議院 | 参議院
+  string meeting_name = 5;
+  string motion = 6; // 議案・件名
+  string date = 7; // YYYY-MM-DD (meeting date)
+  string result = 8; // passed | rejected | unknown
+  int32 yes_count = 9;
+  int32 no_count = 10;
+  int32 abstain_count = 11;
+  bool has_named_votes = 12; // per-person 記名投票 records exist → renderable on the map
+  Attribution attribution = 13;
+}
+
+message ListVoteEventsRequest {
+  int32 session = 1; // 0 = current (latest observed session)
+  string house = 2; // "" = both
+  bool mappable_only = 3; // true = only events that carry per-person 記名投票 records
+  int32 page_size = 4;
+  string page_token = 5;
+}
+message ListVoteEventsResponse {
+  int32 session = 1; // the resolved session (echoes the latest when the request was 0)
+  repeated VoteEventSummary vote_events = 2;
+  string next_page_token = 3;
+}
+
 // ── e-Gov 法令 (egov-law) ───────────────────────────────────────────────────────
 
 // LegislativeWork (Akoma Ntoso aligned) — law-level metadata. The 現行 (in-force)
@@ -141,6 +208,11 @@ message LawNodeChange {
   string op = 2; // added | deleted | modified | moved
   string node_type = 3;
   string num = 4;
+  // Normative text before/after the change (著作権法13条 free). Surfaced so the UI
+  // can render the change WITHIN its article context, never as a bare snippet
+  // (DISCIPLINE §7 / E2). prev_text empty when added, curr_text empty when deleted.
+  string prev_text = 5;
+  string curr_text = 6;
 }
 message LawChange {
   int64 observation_seq = 1; // backing observation.event.seq (provenance)
@@ -177,4 +249,86 @@ message GetLawChangesRequest {
 message GetLawChangesResponse {
   repeated LawChange changes = 1;
   string next_page_token = 2;
+}
+
+// ── Cross-source timeline (ADR-000006) ───────────────────────────────────────
+
+// One human-readable entry on the cross-source timeline, backed 1:1 by an
+// observation.event. Status (event_type) and ordering (seq) come from the
+// immutable event; the human-readable body is injected from the interpretation
+// read models at read time. Diff content is never carried here (§7): only the
+// structural change counts, with the item linking to the detail view.
+message TimelineItem {
+  int64 seq = 1; // global observation.event.seq: ordering + keyset cursor + provenance
+  string event_type = 2; // ResourceObserved | ResourceChanged | ResourceVanished | ResourceRestored
+  string source = 3; // kokkai | egov-law
+  string stream_id = 4;
+  string observed_at = 5; // RFC3339 UTC (== attribution.fetched_at)
+  string source_published_at = 6; // RFC3339 UTC, "" when the source claimed none
+  string title = 7; // neutral headline (会議名 / 法令名); no editorializing
+  string subtitle = 8; // secondary line (会期/院/号 or 法令番号)
+  // Navigation targets — the UI routes on whichever is set.
+  string issue_id = 9; // kokkai → GetMeeting
+  string law_id = 10; // egov-law → GetLaw / GetLawChanges
+  string featured_vote_event_id = 11; // when a 記名投票 is featured → GetVoteEvent
+  // Law-change enrichment (egov ResourceChanged), neutral chips. Counts only —
+  // the before/after text lives in GetLawChanges, shown in-context (§7).
+  string classification = 12; // administrative | substantive | ""
+  string class_confidence = 13; // high | medium | low | ""
+  int32 nodes_added = 14;
+  int32 nodes_deleted = 15;
+  int32 nodes_modified = 16;
+  bool was_ocr = 17; // low-confidence extraction flag (caution chip)
+  Attribution attribution = 18;
+}
+
+message ListTimelineRequest {
+  string source = 1; // "" = all
+  string event_type = 2; // "" = all
+  string classification = 3; // "" = all (administrative | substantive)
+  string since = 4; // RFC3339, observed_at >= since; "" = open
+  string until = 5; // RFC3339, observed_at < until; "" = open
+  string keyword = 6; // matches structured fields only (title/subtitle); never speech text (ADR-000006)
+  int32 page_size = 7;
+  string page_token = 8; // opaque keyset cursor over seq
+  // NOTE: there is deliberately no person_id / speaker filter (anti-doxxing,
+  // ADR-000004/000006). Per-legislator data is served only as a vote record.
+}
+
+message ListTimelineResponse {
+  repeated TimelineItem items = 1;
+  string next_page_token = 2;
+}
+
+// ── Per-legislator 記名投票 record (ADR-000006) ───────────────────────────────
+
+// One named vote by a legislator, with the motion + meeting context (never a bare
+// option). The featured actor is an accountable public official (Diet member).
+message LegislatorVote {
+  string vote_event_id = 1;
+  string issue_id = 2;
+  string motion = 3; // 議案・件名
+  string option = 4; // yes | no | abstain
+  string result = 5; // event outcome: passed | rejected | unknown
+  string meeting_name = 6;
+  string house = 7;
+  string date = 8; // YYYY-MM-DD (meeting date)
+  string confidence = 9; // vote-level extraction confidence
+  Attribution attribution = 10;
+}
+
+message ListLegislatorVotesRequest {
+  string person_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListLegislatorVotesResponse {
+  string person_id = 1;
+  string person_name = 2;
+  // Only "high" is compiled; for medium/low the votes list is empty and the UI
+  // explains that a possible homonym is not merged (ADR-000006 anti-misprofiling).
+  string identity_confidence = 3;
+  repeated LegislatorVote votes = 4;
+  string next_page_token = 5;
 }
