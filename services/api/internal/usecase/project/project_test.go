@@ -55,6 +55,10 @@ func (r fakeReader) EventsSince(_ context.Context, after int64, limit int) ([]po
 	return out, nil
 }
 
+func (r fakeReader) PrevContentSnapshot(context.Context, string, int64) ([]byte, bool, error) {
+	return nil, false, nil
+}
+
 type fakeOffsets struct {
 	off     int64
 	rebuilt bool

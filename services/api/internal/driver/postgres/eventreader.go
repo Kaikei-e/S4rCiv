@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"s4rciv.org/api/internal/blob"
@@ -62,4 +64,28 @@ func (r *EventReader) EventsSince(ctx context.Context, afterSeq int64, limit int
 		out = append(out, ev)
 	}
 	return out, rows.Err()
+}
+
+// PrevContentSnapshot returns the decompressed bytes of the most recent
+// content-bearing snapshot in the stream strictly before beforeSeq (skips
+// ResourceVanished, which carries no content_hash). found=false when none exists.
+func (r *EventReader) PrevContentSnapshot(ctx context.Context, streamID string, beforeSeq int64) ([]byte, bool, error) {
+	var raw []byte
+	err := r.pool.QueryRow(ctx, `
+		SELECT s.bytes
+		FROM observation.event e
+		JOIN observation.snapshot s ON s.content_hash = e.content_hash
+		WHERE e.stream_id = $1 AND e.seq < $2 AND e.content_hash IS NOT NULL
+		ORDER BY e.seq DESC LIMIT 1`, streamID, beforeSeq).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	content, err := blob.Decompress(raw)
+	if err != nil {
+		return nil, false, err
+	}
+	return content, true, nil
 }

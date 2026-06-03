@@ -16,10 +16,13 @@ import (
 )
 
 type Handler struct {
-	reader port.QueryReader
+	reader    port.QueryReader
+	lawReader port.LawQueryReader
 }
 
-func New(reader port.QueryReader) *Handler { return &Handler{reader: reader} }
+func New(reader port.QueryReader, lawReader port.LawQueryReader) *Handler {
+	return &Handler{reader: reader, lawReader: lawReader}
+}
 
 func (h *Handler) GetMeeting(ctx context.Context, req *connect.Request[queryv1.GetMeetingRequest]) (*connect.Response[queryv1.GetMeetingResponse], error) {
 	id := req.Msg.GetIssueId()
@@ -75,6 +78,125 @@ func (h *Handler) GetVoteEvent(ctx context.Context, req *connect.Request[queryv1
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("vote event %s not found", id))
 	}
 	return connect.NewResponse(&queryv1.GetVoteEventResponse{VoteEvent: toVoteEvent(v)}), nil
+}
+
+func (h *Handler) GetLaw(ctx context.Context, req *connect.Request[queryv1.GetLawRequest]) (*connect.Response[queryv1.GetLawResponse], error) {
+	id := req.Msg.GetLawId()
+	if id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("law_id is required"))
+	}
+	lv, nodes, found, err := h.lawReader.GetLaw(ctx, id)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("law %s not found", id))
+	}
+	out := &queryv1.GetLawResponse{Law: toLaw(lv)}
+	for _, n := range nodes {
+		out.Nodes = append(out.Nodes, toLawNode(n))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Handler) ListLaws(ctx context.Context, req *connect.Request[queryv1.ListLawsRequest]) (*connect.Response[queryv1.ListLawsResponse], error) {
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := parseOffset(req.Msg.GetPageToken())
+
+	views, err := h.lawReader.ListLaws(ctx, req.Msg.GetLawType(), limit+1, offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.ListLawsResponse{}
+	if len(views) > limit {
+		out.NextPageToken = strconv.Itoa(offset + limit)
+		views = views[:limit]
+	}
+	for _, lv := range views {
+		out.Laws = append(out.Laws, toLaw(lv))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Handler) GetLawChanges(ctx context.Context, req *connect.Request[queryv1.GetLawChangesRequest]) (*connect.Response[queryv1.GetLawChangesResponse], error) {
+	id := req.Msg.GetLawId()
+	if id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("law_id is required"))
+	}
+	limit := int(req.Msg.GetPageSize())
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	offset := parseOffset(req.Msg.GetPageToken())
+
+	changes, err := h.lawReader.GetLawChanges(ctx, id, limit+1, offset)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.GetLawChangesResponse{}
+	if len(changes) > limit {
+		out.NextPageToken = strconv.Itoa(offset + limit)
+		changes = changes[:limit]
+	}
+	for _, c := range changes {
+		out.Changes = append(out.Changes, toLawChange(c))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func toLaw(lv port.LawView) *queryv1.Law {
+	return &queryv1.Law{
+		LawId:                    lv.Law.LawID,
+		LawNum:                   lv.Law.LawNum,
+		LawType:                  lv.Law.LawType,
+		LawTitle:                 lv.Law.Title,
+		LawTitleKana:             lv.Law.TitleKana,
+		Category:                 lv.Law.Category,
+		PromulgationDate:         lv.Law.PromulgationDate,
+		CurrentRevisionId:        lv.Law.CurrentRevisionID,
+		AmendmentEnforcementDate: lv.Law.AmendmentEnforcementDate,
+		CurrentRevisionStatus:    lv.Law.CurrentRevisionStatus,
+		RepealStatus:             lv.Law.RepealStatus,
+		RepealDate:               lv.Law.RepealDate,
+		Attribution:              toAttribution(lv.Attr),
+	}
+}
+
+func toLawNode(n port.LawNodeView) *queryv1.LawNode {
+	return &queryv1.LawNode{
+		Eid:          n.Node.EID,
+		ParentEid:    n.Node.ParentEID,
+		NodeType:     n.Node.NodeType,
+		Num:          n.Node.Num,
+		Caption:      n.Node.Caption,
+		ChapterNum:   n.Node.ChapterNum,
+		SectionNum:   n.Node.SectionNum,
+		IsSuppl:      n.Node.IsSuppl,
+		SentenceText: n.Node.SentenceText,
+		Ordinal:      int32(n.Node.Ordinal),
+	}
+}
+
+func toLawChange(c port.LawChangeView) *queryv1.LawChange {
+	out := &queryv1.LawChange{
+		ObservationSeq:  c.ObservationSeq,
+		DifferVersion:   c.DifferVersion,
+		Classification:  c.Classification,
+		ClassConfidence: c.ClassConfidence,
+		ObservedAt:      c.ObservedAt.UTC().Format(time.RFC3339),
+	}
+	for _, nc := range c.NodeChanges {
+		out.NodeChanges = append(out.NodeChanges, &queryv1.LawNodeChange{
+			Eid:      nc.EID,
+			Op:       nc.Op,
+			NodeType: nc.NodeType,
+			Num:      nc.Num,
+		})
+	}
+	return out
 }
 
 func toMeeting(mv port.MeetingView) *queryv1.Meeting {

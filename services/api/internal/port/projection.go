@@ -22,6 +22,11 @@ type ObservedEvent struct {
 // EventReader streams observation events in seq order for projection.
 type EventReader interface {
 	EventsSince(ctx context.Context, afterSeq int64, limit int) ([]ObservedEvent, error)
+	// PrevContentSnapshot returns the most recent content-bearing (decompressed)
+	// snapshot in the stream strictly before beforeSeq. found=false when none
+	// exists (e.g. the first observation of a stream). Used by the diff usecase to
+	// pair consecutive snapshots per stream.
+	PrevContentSnapshot(ctx context.Context, streamID string, beforeSeq int64) ([]byte, bool, error)
 }
 
 // ProjectorOffset tracks how far a projector has folded (interpretation.projector_offset).

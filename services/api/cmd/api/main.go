@@ -31,7 +31,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	handler := queryrpc.New(postgres.NewQueryReader(pool))
+	handler := queryrpc.New(postgres.NewQueryReader(pool), postgres.NewLawQueryReader(pool))
 	mux := http.NewServeMux()
 	mux.Handle(queryv1connect.NewQueryServiceHandler(handler))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
