@@ -32,6 +32,7 @@ import (
 	"s4rciv.org/api/internal/gateway/egov"
 	"s4rciv.org/api/internal/gateway/giinroster"
 	"s4rciv.org/api/internal/gateway/kokkai"
+	"s4rciv.org/api/internal/gateway/sangiin"
 	"s4rciv.org/api/internal/port"
 	"s4rciv.org/api/internal/usecase/collect"
 	"s4rciv.org/api/internal/usecase/diff"
@@ -54,7 +55,7 @@ type pipeline interface {
 
 func main() {
 	fs := flag.NewFlagSet("collector", flag.ExitOnError)
-	source := fs.String("source", "kokkai", "source to operate on (kokkai | egov-law | giin-roster)")
+	source := fs.String("source", "kokkai", "source to operate on (kokkai | egov-law | giin-roster | sangiin-vote | sangiin-roster)")
 	_ = fs.Parse(os.Args[1:])
 	rest := fs.Args()
 	if len(rest) < 1 {
@@ -128,9 +129,37 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 			postgres.NewEventLog(pool), gw, control, gw, sys.Clock{}, sys.IDGen{},
 			collect.Config{FetcherVersion: collectorVersion, Source: giinroster.SourceName},
 		)
-		rm := postgres.NewRosterReadModel(pool)
-		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, giinroster.SourceName)
+		rm := postgres.NewRosterReadModel(pool, giinroster.StreamID(""))
+		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, giinroster.SourceName, giinroster.StreamID(""))
 		return &giinRosterPipeline{collector: collector, projector: projector}, nil
+
+	case sangiin.SourceName: // 参議院本会議投票結果 (touhyoulist) — per-member roll-calls (ADR-000010)
+		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
+		if err != nil {
+			return nil, err
+		}
+		gw := sangiin.New(httpc)
+		collector := collect.New(
+			postgres.NewEventLog(pool), gw, control, noLister{}, sys.Clock{}, sys.IDGen{},
+			collect.Config{FetcherVersion: collectorVersion, Source: sangiin.SourceName},
+		)
+		rm := postgres.NewSangiinVoteReadModel(pool)
+		projector := project.NewSangiinVote(postgres.NewEventReader(pool), gw, rm, rm, sangiin.SourceName)
+		return &sangiinVotePipeline{collector: collector, projector: projector, gw: gw, control: control}, nil
+
+	case sangiin.RosterSourceName: // 参議院議員名簿 → legislator_district (house=参議院)
+		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
+		if err != nil {
+			return nil, err
+		}
+		gw := sangiin.New(httpc)
+		collector := collect.New(
+			postgres.NewEventLog(pool), gw, control, noLister{}, sys.Clock{}, sys.IDGen{},
+			collect.Config{FetcherVersion: collectorVersion, Source: sangiin.RosterSourceName},
+		)
+		rm := postgres.NewRosterReadModel(pool, sangiin.RosterStreamID(""))
+		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, sangiin.RosterSourceName, sangiin.RosterStreamID(""))
+		return &sangiinRosterPipeline{collector: collector, projector: projector, gw: gw, control: control}, nil
 
 	case egov.SourceName:
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
@@ -245,6 +274,112 @@ func (g *giinRosterPipeline) discover(ctx context.Context, _ []string) {
 	log.Printf("discover: upserted %d watches", n)
 }
 
+// ── 参議院 pipelines (vote + roster) ─────────────────────────────────────────
+
+// noLister satisfies the Collector's MeetingLister dependency for sources whose
+// discovery is bespoke (sangiin) and never goes through collect.Discover.
+type noLister struct{}
+
+func (noLister) ListMeetings(context.Context, port.ListScope) ([]port.MeetingRef, error) {
+	return nil, nil
+}
+
+type sangiinVotePipeline struct {
+	collector *collect.Collector
+	projector *project.SangiinVoteProjector
+	gw        *sangiin.Gateway
+	control   port.ControlStore
+}
+
+func (p *sangiinVotePipeline) source() string { return sangiin.SourceName }
+
+func (p *sangiinVotePipeline) cycle(ctx context.Context) {
+	emitted, err := p.collector.PollOnce(ctx, sangiin.SourceName, pollBatch)
+	if err != nil {
+		log.Printf("poll: %v", err)
+	} else {
+		log.Printf("poll: emitted %d events", emitted)
+	}
+	projected, err := p.projector.Run(ctx)
+	if err != nil {
+		log.Printf("project: %v", err)
+		return
+	}
+	log.Printf("project: %d vote pages", projected)
+}
+
+func (p *sangiinVotePipeline) reproject(ctx context.Context) error {
+	n, err := p.projector.Reproject(ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("reproject: projected %d vote pages", n)
+	return nil
+}
+
+func (p *sangiinVotePipeline) discover(ctx context.Context, _ []string) {
+	refs, err := p.gw.DiscoverVotes(ctx)
+	if err != nil {
+		log.Fatalf("discover: %v", err)
+	}
+	for _, r := range refs {
+		if err := p.control.UpsertWatch(ctx, port.Watch{
+			StreamID: r.StreamID, Source: sangiin.SourceName,
+			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
+		}); err != nil {
+			log.Fatalf("upsert watch %s: %v", r.StreamID, err)
+		}
+	}
+	log.Printf("discover: upserted %d watches", len(refs))
+}
+
+type sangiinRosterPipeline struct {
+	collector *collect.Collector
+	projector *project.RosterProjector
+	gw        *sangiin.Gateway
+	control   port.ControlStore
+}
+
+func (p *sangiinRosterPipeline) source() string { return sangiin.RosterSourceName }
+
+func (p *sangiinRosterPipeline) cycle(ctx context.Context) {
+	emitted, err := p.collector.PollOnce(ctx, sangiin.RosterSourceName, pollBatch)
+	if err != nil {
+		log.Printf("poll: %v", err)
+	} else {
+		log.Printf("poll: emitted %d events", emitted)
+	}
+	projected, err := p.projector.Run(ctx)
+	if err != nil {
+		log.Printf("project: %v", err)
+		return
+	}
+	log.Printf("project: %d roster pages", projected)
+}
+
+func (p *sangiinRosterPipeline) reproject(ctx context.Context) error {
+	n, err := p.projector.Reproject(ctx)
+	if err != nil {
+		return err
+	}
+	log.Printf("reproject: projected %d roster pages", n)
+	return nil
+}
+
+func (p *sangiinRosterPipeline) discover(ctx context.Context, _ []string) {
+	ref, err := p.gw.DiscoverRoster(ctx)
+	if err != nil {
+		log.Fatalf("discover: %v", err)
+	}
+	if err := p.control.UpsertWatch(ctx, port.Watch{
+		StreamID: ref.StreamID, Source: sangiin.RosterSourceName,
+		SourceLocalKey: ref.SourceLocalKey, CanonicalURL: ref.CanonicalURL,
+	}); err != nil {
+		log.Fatalf("upsert watch: %v", err)
+	}
+	log.Printf("discover: upserted 1 watch (%s)", ref.CanonicalURL)
+}
+
 // ── egov-law pipeline ───────────────────────────────────────────────────────
 
 type egovPipeline struct {
@@ -334,7 +469,7 @@ func runDaemon(ctx context.Context, p pipeline) {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law|giin-roster] <run|poll-once|reproject|discover>
+	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law|giin-roster|sangiin-vote|sangiin-roster] <run|poll-once|reproject|discover>
 
   run         daemon: poll due watches + project on a loop
   poll-once   one poll+project cycle, then exit

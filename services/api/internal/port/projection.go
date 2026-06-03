@@ -114,3 +114,25 @@ type RosterReadModelStore interface {
 	ApplyRoster(ctx context.Context, b RosterProjectionBatch) error
 	TruncateRoster(ctx context.Context) error
 }
+
+// ── 参議院本会議投票結果 (sangiin-vote) projection (ADR-000010) ────────────────────
+
+// SangiinVoteNormalizer parses a 参議院 roll-call page snapshot into per-member votes.
+type SangiinVoteNormalizer interface {
+	ParseVotePage(content []byte) (leg.SangiinVotePage, error)
+}
+
+// SangiinVoteProjectionBatch is the sangiin_vote rows derived from one vote-result page.
+type SangiinVoteProjectionBatch struct {
+	VoteEventID    string // page slug, e.g. "221-0407-v001"
+	Page           leg.SangiinVotePage
+	Permalink      string
+	ObservationSeq int64
+	ObservedAt     time.Time
+}
+
+// SangiinVoteReadModelStore writes the disposable 参 vote read model.
+type SangiinVoteReadModelStore interface {
+	ApplySangiinVote(ctx context.Context, b SangiinVoteProjectionBatch) error
+	TruncateSangiinVote(ctx context.Context) error
+}

@@ -35,7 +35,7 @@ func TestRosterProjectorFoldsOnlyRosterStreams(t *testing.T) {
 	}}
 	store := &fakeRosterStore{}
 	offsets := &fakeOffsets{}
-	p := NewRoster(fakeReader{evs: evs}, norm, store, offsets, "giin-roster")
+	p := NewRoster(fakeReader{evs: evs}, norm, store, offsets, "giin-roster", "giin-roster:")
 
 	n, err := p.Run(context.Background())
 	if err != nil {

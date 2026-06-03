@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	leg "s4rciv.org/api/internal/domain/legislative"
 	"s4rciv.org/api/internal/port"
 )
 
@@ -15,16 +14,17 @@ import (
 // reproject from seq 0 reproduces the same read model. It folds the shared
 // observation log, so it skips other sources' streams, mirroring LawProjector.
 type RosterProjector struct {
-	reader    port.EventReader
-	norm      port.RosterNormalizer
-	store     port.RosterReadModelStore
-	offsets   port.ProjectorOffset
-	name      string
-	batchSize int
+	reader       port.EventReader
+	norm         port.RosterNormalizer
+	store        port.RosterReadModelStore
+	offsets      port.ProjectorOffset
+	name         string
+	streamPrefix string // only fold streams under this prefix (giin-roster: or sangiin-roster:)
+	batchSize    int
 }
 
-func NewRoster(reader port.EventReader, norm port.RosterNormalizer, store port.RosterReadModelStore, offsets port.ProjectorOffset, name string) *RosterProjector {
-	return &RosterProjector{reader: reader, norm: norm, store: store, offsets: offsets, name: name, batchSize: DefaultBatchSize}
+func NewRoster(reader port.EventReader, norm port.RosterNormalizer, store port.RosterReadModelStore, offsets port.ProjectorOffset, name, streamPrefix string) *RosterProjector {
+	return &RosterProjector{reader: reader, norm: norm, store: store, offsets: offsets, name: name, streamPrefix: streamPrefix, batchSize: DefaultBatchSize}
 }
 
 // Run folds every observation event past the stored offset, projecting only
@@ -44,7 +44,7 @@ func (p *RosterProjector) Run(ctx context.Context) (int, error) {
 			return processed, nil
 		}
 		for _, ev := range evs {
-			if ev.SnapshotBytes != nil && isRosterStream(ev.StreamID) {
+			if ev.SnapshotBytes != nil && strings.HasPrefix(ev.StreamID, p.streamPrefix) {
 				if err := p.project(ctx, ev); err != nil {
 					return processed, fmt.Errorf("project seq %d: %w", ev.Seq, err)
 				}
@@ -80,8 +80,4 @@ func (p *RosterProjector) project(ctx context.Context, ev port.ObservedEvent) er
 		ObservationSeq: ev.Seq,
 		ObservedAt:     ev.ObservedAt,
 	})
-}
-
-func isRosterStream(streamID string) bool {
-	return strings.HasPrefix(streamID, leg.RosterStreamID(""))
 }

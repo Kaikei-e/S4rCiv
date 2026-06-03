@@ -23,11 +23,17 @@ const (
 // (houseKey like "shugiin-a"), mirroring MeetingStreamID / LawStreamID.
 func RosterStreamID(pageKey string) string { return "giin-roster:" + pageKey }
 
+// NameKey is the normalized join key for matching a vote's voter name to a roster
+// member by name (used for 参 votes, which carry no ふりがな so person_id — which bakes
+// in yomi — can't match the roster). Same normalization as PersonIdentity's name half.
+func NameKey(name string) string { return normalizeName(name) }
+
 // RosterEntry is one current member's seat. The geometry-binding invariant matches
 // the migration CHECK: a district member has DistrictCode (== GeoJSON kucode); a
 // 比例 member has none and is shown in the companion panel, never erased (§5).
 type RosterEntry struct {
 	PersonID           string
+	NameKey            string // normalized name, for the 参 vote→roster name join
 	Name               string
 	Yomi               string
 	House              string // 衆議院 | 参議院
@@ -49,6 +55,7 @@ func NewShugiinRosterEntry(name, yomi, group, senkyoku string) (RosterEntry, boo
 	pid, conf := PersonIdentity(name, yomi)
 	return RosterEntry{
 		PersonID:           pid,
+		NameKey:            NameKey(name),
 		Name:               displayName(name),
 		Yomi:               collapseSpaces(yomi),
 		House:              HouseRepresentatives,
@@ -70,6 +77,7 @@ func NewSangiinRosterEntry(name, yomi, group, senkyoku string) (RosterEntry, boo
 	pid, conf := PersonIdentity(name, yomi)
 	e := RosterEntry{
 		PersonID:           pid,
+		NameKey:            NameKey(name),
 		Name:               displayName(name),
 		Yomi:               collapseSpaces(yomi),
 		House:              HouseCouncillors,
