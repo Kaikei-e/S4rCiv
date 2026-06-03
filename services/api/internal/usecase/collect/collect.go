@@ -1,0 +1,138 @@
+// Package collect is the command-side usecase: fetch a watched Resource, decide
+// what changed, and append the resulting observation event. It depends only on
+// ports — no HTTP, no SQL, no clock of its own — so the whole pipeline is unit
+// testable with fakes.
+package collect
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	obs "s4rciv.org/api/internal/domain/observation"
+	"s4rciv.org/api/internal/port"
+)
+
+type Collector struct {
+	log     port.EventLog
+	fetcher port.ResourceFetcher
+	control port.ControlStore
+	lister  port.MeetingLister
+	clock   port.Clock
+	ids     port.IDGenerator
+
+	fetcherVersion string
+	pollCadence    time.Duration // how long until a stream is polled again
+}
+
+type Config struct {
+	FetcherVersion string
+	PollCadence    time.Duration
+}
+
+func New(
+	log port.EventLog, fetcher port.ResourceFetcher, control port.ControlStore,
+	lister port.MeetingLister, clock port.Clock, ids port.IDGenerator, cfg Config,
+) *Collector {
+	if cfg.PollCadence <= 0 {
+		cfg.PollCadence = 24 * time.Hour
+	}
+	return &Collector{
+		log: log, fetcher: fetcher, control: control, lister: lister,
+		clock: clock, ids: ids,
+		fetcherVersion: cfg.FetcherVersion, pollCadence: cfg.PollCadence,
+	}
+}
+
+// PollOnce polls every currently-due watch for a source, serially (DISCIPLINE
+// §1). Returns how many observation events were emitted.
+func (c *Collector) PollOnce(ctx context.Context, source string, limit int) (int, error) {
+	due, err := c.control.DueWatches(ctx, source, c.clock.Now(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("due watches: %w", err)
+	}
+	emitted := 0
+	for _, w := range due {
+		ok, err := c.PollStream(ctx, w)
+		if err != nil {
+			// Record the failure cursor (backoff) and keep going; one bad stream
+			// must not stall the rest.
+			_ = c.control.MarkPolled(ctx, w.StreamID, c.clock.Now(), c.nextDue(), false)
+			continue
+		}
+		if ok {
+			emitted++
+		}
+	}
+	return emitted, nil
+}
+
+// PollStream fetches one Resource and appends an event iff something changed.
+// Returns true when an event was emitted.
+func (c *Collector) PollStream(ctx context.Context, w port.Watch) (bool, error) {
+	if err := c.log.EnsureStream(ctx, port.Stream{
+		StreamID: w.StreamID, Source: w.Source,
+		SourceLocalKey: w.SourceLocalKey, CanonicalURL: w.CanonicalURL,
+	}); err != nil {
+		return false, fmt.Errorf("ensure stream: %w", err)
+	}
+
+	res, err := c.fetcher.Fetch(ctx, w)
+	if err != nil {
+		return false, fmt.Errorf("fetch: %w", err)
+	}
+	state, err := c.log.StreamState(ctx, w.StreamID)
+	if err != nil {
+		return false, fmt.Errorf("stream state: %w", err)
+	}
+
+	var observed *obs.Digest
+	if res.Present && res.Snapshot != nil {
+		observed = &res.Snapshot.ContentHash
+	}
+
+	t := obs.Decide(state, observed)
+	if !t.Emit {
+		return false, c.control.MarkPolled(ctx, w.StreamID, c.clock.Now(), c.nextDue(), true)
+	}
+
+	snap := res.Snapshot
+	if t.Type == obs.ResourceVanished {
+		snap = nil // vanished carries no content
+	}
+	cmd := port.AppendCmd{
+		Stream:            port.Stream{StreamID: w.StreamID, Source: w.Source, SourceLocalKey: w.SourceLocalKey, CanonicalURL: w.CanonicalURL},
+		Type:              t.Type,
+		EventID:           c.ids.NewID(),
+		Source:            w.Source,
+		FetcherVersion:    c.fetcherVersion,
+		ObservedAt:        c.clock.Now(),
+		SourcePublishedAt: res.SourcePublishedAt,
+		Snapshot:          snap,
+		PrevContentHash:   t.PrevContentHash,
+	}
+	if _, err := c.log.Append(ctx, cmd); err != nil {
+		return false, fmt.Errorf("append: %w", err)
+	}
+	return true, c.control.MarkPolled(ctx, w.StreamID, c.clock.Now(), c.nextDue(), true)
+}
+
+// Discover traverses the source listing and adds discovered resources to the
+// watch list. Returns how many refs were upserted.
+func (c *Collector) Discover(ctx context.Context, scope port.ListScope) (int, error) {
+	refs, err := c.lister.ListMeetings(ctx, scope)
+	if err != nil {
+		return 0, fmt.Errorf("list meetings: %w", err)
+	}
+	for _, r := range refs {
+		if err := c.control.UpsertWatch(ctx, port.Watch{
+			StreamID: r.StreamID, Source: "kokkai",
+			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
+		}); err != nil {
+			return 0, fmt.Errorf("upsert watch %s: %w", r.StreamID, err)
+		}
+	}
+	return len(refs), nil
+}
+
+func (c *Collector) nextDue() time.Time { return c.clock.Now().Add(c.pollCadence) }
