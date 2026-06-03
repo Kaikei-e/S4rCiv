@@ -42,6 +42,9 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
 		LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
 		WHERE ($1 = 0 OR e.seq < $1)
+		  -- giin-roster is map-support reference data (ADR-000008), not a public-record
+		  -- change; it never appears on the citizen timeline / Atom feed (ADR-000006/000007).
+		  AND e.source <> 'giin-roster'
 		  AND ($2 = '' OR e.source = $2)
 		  AND ($3 = '' OR e.type::text = $3)
 		  AND ($4 = '' OR c.classification = $4)
