@@ -2,9 +2,14 @@
 	import type { PageData } from './$types';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
 	import LawChangeBlock from '$lib/components/LawChangeBlock.svelte';
+	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const law = $derived(data.law);
+	// Deep-link the provenance chip to this record's row in the verification panel.
+	const verifyHref = $derived(
+		law.attribution?.observationSeq ? `#verify-${law.attribution.observationSeq}` : undefined
+	);
 
 	// Indent depth. 号の細分 (subitem) share one flat node_type, so the イ→(1)→(ア) nesting
 	// depth is read from the eId (each level adds one __subitem segment).
@@ -32,7 +37,7 @@
 				· 施行 {law.amendmentEnforcementDate}{/if}
 		</p>
 		{#if repealed}<p class="repeal">⊘ {law.repealStatus} {law.repealDate ?? ''}</p>{/if}
-		<ProvenanceChip attr={law.attribution} />
+		<ProvenanceChip attr={law.attribution} {verifyHref} />
 	</header>
 
 	<section aria-label="変更履歴">
@@ -66,6 +71,10 @@
 			>
 		{/if}
 	</section>
+
+	{#if data.verification}
+		<VerificationPanel data={data.verification} />
+	{/if}
 </main>
 
 <style>

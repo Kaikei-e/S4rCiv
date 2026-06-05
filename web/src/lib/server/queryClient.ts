@@ -24,6 +24,10 @@ import type {
 	ListSangiinVoteEventsResponse,
 	GetSangiinVoteMapResponse
 } from '$lib/types';
+// Type-only: the verifier owns the GetStreamVerification JSON shape so the panel
+// and this client agree on one definition. import type is erased — no runtime
+// (browser-only WebCrypto) code is pulled into the server bundle.
+import type { StreamVerificationJson } from '$lib/verification/verifier';
 
 const BASE = (env.API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
 
@@ -80,4 +84,11 @@ export async function listSangiinVoteEvents(session = 0): Promise<ListSangiinVot
 
 export async function getSangiinVoteMap(voteEventId: string): Promise<GetSangiinVoteMapResponse> {
 	return json<GetSangiinVoteMapResponse>(await client.getSangiinVoteMap({ voteEventId }));
+}
+
+// 完全性検証 read surface (ADR-000014): one Stream's events + covering checkpoint,
+// for the in-browser verifier. emitDefaultValues keeps the zero/empty HashableEvent
+// fields present in the JSON so the verifier re-marshals the exact canonical form.
+export async function getStreamVerification(streamId: string): Promise<StreamVerificationJson> {
+	return json<StreamVerificationJson>(await client.getStreamVerification({ streamId }));
 }

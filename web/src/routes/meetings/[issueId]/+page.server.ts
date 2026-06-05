@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { getMeeting } from '$lib/server/queryClient';
+import { getMeeting, getStreamVerification } from '$lib/server/queryClient';
+import type { StreamVerificationJson } from '$lib/verification/verifier';
 
 export const load: PageServerLoad = async ({ params }) => {
 	let res;
@@ -10,5 +11,18 @@ export const load: PageServerLoad = async ({ params }) => {
 		throw error(404, e instanceof Error ? e.message : '会議録の取得に失敗しました');
 	}
 	if (!res.meeting) throw error(404, '会議録が見つかりません');
-	return { meeting: res.meeting, speeches: res.speeches ?? [] };
+
+	// Per-case verification payload (ADR-000014), keyed by the observation-plane
+	// stream_id the backend resolved. Fail soft: a verification hiccup must not 404
+	// the page — the panel just won't render.
+	let verification: StreamVerificationJson | null = null;
+	const streamId = res.meeting.attribution?.streamId;
+	if (streamId) {
+		try {
+			verification = await getStreamVerification(streamId);
+		} catch {
+			verification = null;
+		}
+	}
+	return { meeting: res.meeting, speeches: res.speeches ?? [], verification };
 };

@@ -11,6 +11,7 @@ export interface Attribution {
 	wasOcr?: boolean;
 	logHash?: string;
 	prevLogHash?: string;
+	streamId?: string;
 }
 
 export interface TimelineItem {

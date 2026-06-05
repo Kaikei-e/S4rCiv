@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
+	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
 
 	let { data }: { data: PageData } = $props();
 	const m = $derived(data.meeting);
@@ -8,6 +9,10 @@
 		[m.session ? `第${m.session}回` : '', m.house ?? '', m.issue ?? '', m.date ?? '']
 			.filter(Boolean)
 			.join(' · ')
+	);
+	// Deep-link the provenance chip to this record's row in the verification panel.
+	const verifyHref = $derived(
+		m.attribution?.observationSeq ? `#verify-${m.attribution.observationSeq}` : undefined
 	);
 </script>
 
@@ -20,7 +25,7 @@
 		<span class="label">国会会議録</span>
 		<h1>{m.meetingName ?? m.issueId}</h1>
 		<p class="meta mono">{subtitle}</p>
-		<ProvenanceChip attr={m.attribution} />
+		<ProvenanceChip attr={m.attribution} {verifyHref} />
 	</header>
 
 	<!-- The full meeting is shown in order (§7-safe). We never compile one speaker's
@@ -50,6 +55,10 @@
 		<a class="ext" href={m.attribution.permalink} target="_blank" rel="noopener noreferrer external"
 			>NDL 国会会議録検索システムで原文を見る ↗</a
 		>
+	{/if}
+
+	{#if data.verification}
+		<VerificationPanel data={data.verification} />
 	{/if}
 </main>
 

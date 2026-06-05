@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
+import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetStreamVerificationRequest, GetStreamVerificationResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -140,6 +140,26 @@ export const QueryService = {
       name: "ListLegislatorVotes",
       I: ListLegislatorVotesRequest,
       O: ListLegislatorVotesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ── 完全性検証 read surface (ADR-000014) ────────────────────────────────────
+     * Per-Stream (事案) export for in-browser BOUNDED integrity verification: every
+     * event's canonical HashableEvent (the exact field set hashed; ADR-000003) plus
+     * its stored log_hash, so the READER'S OWN machine recomputes
+     * log_hash = sha256(Deterministic-marshal(HashableEvent)) and checks the
+     * content/log chain. This is deliberately NOT a server-asserted "verified" flag:
+     * §5's adversary distrusts S4rCiv, so a green ✓ from S4rCiv is "grading your own
+     * exam". The server returns ground-truth fields; the browser judges. Bounded to
+     * one Stream; full genesis→head recomputation is delegated to third-party mirrors
+     * via export (the global log chain is impractical to replay per page load).
+     *
+     * @generated from rpc s4rciv.query.v1.QueryService.GetStreamVerification
+     */
+    getStreamVerification: {
+      name: "GetStreamVerification",
+      I: GetStreamVerificationRequest,
+      O: GetStreamVerificationResponse,
       kind: MethodKind.Unary,
     },
   }

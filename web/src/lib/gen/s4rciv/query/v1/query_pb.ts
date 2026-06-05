@@ -5,6 +5,7 @@
 
 import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialMessage, PlainMessage } from "@bufbuild/protobuf";
 import { Message, proto3, protoInt64 } from "@bufbuild/protobuf";
+import { HashableEvent } from "../../observation/v1/observation_pb.js";
 
 /**
  * Provenance + source attribution attached to every projected record.
@@ -48,10 +49,11 @@ export class Attribution extends Message<Attribution> {
   wasOcr = false;
 
   /**
-   * Global log-chain linkage of the backing event (hex sha256). Shown by the
-   * Provenance chip as "連鎖 #seq ← prev" with a "(未検証)" label: it proves the
-   * chain exists, but is NOT a verification result (real verification is a later
-   * milestone; ADR-000007 / E1). Empty when the reader does not join the event.
+   * Global log-chain linkage of the backing event (hex sha256): it proves the
+   * backing event sits in the chain, but is NOT a verification result. Integrity
+   * verification is per-chain/checkpoint, not per-record, and runs in the per-case
+   * verification panel (ADR-000014; canonical form ADR-000003). Empty when the
+   * reader does not join the event.
    *
    * @generated from field: string log_hash = 6;
    */
@@ -61,6 +63,16 @@ export class Attribution extends Message<Attribution> {
    * @generated from field: string prev_log_hash = 7;
    */
   prevLogHash = "";
+
+  /**
+   * Observation-plane Stream this record belongs to (the monitoring unit;
+   * kokkai:<issueID> / egov-law:<lawID>). The key for GetStreamVerification, so the
+   * UI deep-links a record to its 事案 verification panel without reconstructing the
+   * stream_id prefix client-side. Empty when the reader does not resolve it.
+   *
+   * @generated from field: string stream_id = 8;
+   */
+  streamId = "";
 
   constructor(data?: PartialMessage<Attribution>) {
     super();
@@ -77,6 +89,7 @@ export class Attribution extends Message<Attribution> {
     { no: 5, name: "was_ocr", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
     { no: 6, name: "log_hash", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 7, name: "prev_log_hash", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 8, name: "stream_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Attribution {
@@ -2660,6 +2673,273 @@ export class ListLegislatorVotesResponse extends Message<ListLegislatorVotesResp
 
   static equals(a: ListLegislatorVotesResponse | PlainMessage<ListLegislatorVotesResponse> | undefined, b: ListLegislatorVotesResponse | PlainMessage<ListLegislatorVotesResponse> | undefined): boolean {
     return proto3.util.equals(ListLegislatorVotesResponse, a, b);
+  }
+}
+
+/**
+ * One event laid out for the reader's own machine to re-hash. `hashable` is the
+ * exact, canonical, scalar-only field set over which log_hash was computed
+ * (ADR-000003 proto-linked-v1). The verifier recomputes
+ * sha256(Deterministic-marshal(hashable)) and asserts it equals `log_hash`; a
+ * mismatch means the served facts or hash were altered. It then chains events by
+ * asserting each event's recomputed log_hash equals the next event's
+ * hashable.log_prev_hash (content chain: prev_content_hash continuity).
+ *
+ * @generated from message s4rciv.query.v1.VerifiableEvent
+ */
+export class VerifiableEvent extends Message<VerifiableEvent> {
+  /**
+   * global observation.event.seq (stable citation handle + ordering)
+   *
+   * @generated from field: int64 seq = 1;
+   */
+  seq = protoInt64.zero;
+
+  /**
+   * the exact bytes hashed
+   *
+   * @generated from field: s4rciv.observation.v1.HashableEvent hashable = 2;
+   */
+  hashable?: HashableEvent;
+
+  /**
+   * stored log_hash (lowercase hex); recompute MUST equal this
+   *
+   * @generated from field: string log_hash = 3;
+   */
+  logHash = "";
+
+  constructor(data?: PartialMessage<VerifiableEvent>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.VerifiableEvent";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "seq", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "hashable", kind: "message", T: HashableEvent },
+    { no: 3, name: "log_hash", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): VerifiableEvent {
+    return new VerifiableEvent().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): VerifiableEvent {
+    return new VerifiableEvent().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): VerifiableEvent {
+    return new VerifiableEvent().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: VerifiableEvent | PlainMessage<VerifiableEvent> | undefined, b: VerifiableEvent | PlainMessage<VerifiableEvent> | undefined): boolean {
+    return proto3.util.equals(VerifiableEvent, a, b);
+  }
+}
+
+/**
+ * A commitment to the log chain through `through_seq` (ADR-000014 §4). It bounds
+ * in-browser verification to the nearest checkpoint instead of replaying genesis.
+ * In v0 the signing/anchoring job does not run yet, so `signed`=false and
+ * signature/anchors are empty: the panel states plainly that this is S4rCiv's own
+ * commitment, not yet independently anchored (external anchor未了). What defeats a
+ * FULL re-sign by S4rCiv itself is the external anchor — that is the deferred part.
+ *
+ * @generated from message s4rciv.query.v1.VerificationCheckpoint
+ */
+export class VerificationCheckpoint extends Message<VerificationCheckpoint> {
+  /**
+   * @generated from field: int64 through_seq = 1;
+   */
+  throughSeq = protoInt64.zero;
+
+  /**
+   * @generated from field: int64 tree_size = 2;
+   */
+  treeSize = protoInt64.zero;
+
+  /**
+   * lowercase hex
+   *
+   * @generated from field: string root_hash = 3;
+   */
+  rootHash = "";
+
+  /**
+   * pinned hashing scheme (proto-linked-v1)
+   *
+   * @generated from field: string alg_version = 4;
+   */
+  algVersion = "";
+
+  /**
+   * false in v0 (no signing job yet)
+   *
+   * @generated from field: bool signed = 5;
+   */
+  signed = false;
+
+  /**
+   * "" until signed
+   *
+   * @generated from field: string signer_key_id = 6;
+   */
+  signerKeyId = "";
+
+  /**
+   * RFC3339 UTC
+   *
+   * @generated from field: string recorded_at = 7;
+   */
+  recordedAt = "";
+
+  constructor(data?: PartialMessage<VerificationCheckpoint>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.VerificationCheckpoint";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "through_seq", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "tree_size", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 3, name: "root_hash", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "alg_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "signed", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 6, name: "signer_key_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 7, name: "recorded_at", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): VerificationCheckpoint {
+    return new VerificationCheckpoint().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): VerificationCheckpoint {
+    return new VerificationCheckpoint().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): VerificationCheckpoint {
+    return new VerificationCheckpoint().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: VerificationCheckpoint | PlainMessage<VerificationCheckpoint> | undefined, b: VerificationCheckpoint | PlainMessage<VerificationCheckpoint> | undefined): boolean {
+    return proto3.util.equals(VerificationCheckpoint, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.GetStreamVerificationRequest
+ */
+export class GetStreamVerificationRequest extends Message<GetStreamVerificationRequest> {
+  /**
+   * observation-plane Stream id (kokkai:<issueID> / egov-law:<lawID>)
+   *
+   * @generated from field: string stream_id = 1;
+   */
+  streamId = "";
+
+  constructor(data?: PartialMessage<GetStreamVerificationRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetStreamVerificationRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "stream_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetStreamVerificationRequest {
+    return new GetStreamVerificationRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetStreamVerificationRequest {
+    return new GetStreamVerificationRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetStreamVerificationRequest {
+    return new GetStreamVerificationRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetStreamVerificationRequest | PlainMessage<GetStreamVerificationRequest> | undefined, b: GetStreamVerificationRequest | PlainMessage<GetStreamVerificationRequest> | undefined): boolean {
+    return proto3.util.equals(GetStreamVerificationRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.GetStreamVerificationResponse
+ */
+export class GetStreamVerificationResponse extends Message<GetStreamVerificationResponse> {
+  /**
+   * @generated from field: string stream_id = 1;
+   */
+  streamId = "";
+
+  /**
+   * @generated from field: string source = 2;
+   */
+  source = "";
+
+  /**
+   * the pinned hashing scheme the reader must implement (proto-linked-v1)
+   *
+   * @generated from field: string alg_version = 3;
+   */
+  algVersion = "";
+
+  /**
+   * this stream's events, ordered by stream_seq asc
+   *
+   * @generated from field: repeated s4rciv.query.v1.VerifiableEvent events = 4;
+   */
+  events: VerifiableEvent[] = [];
+
+  /**
+   * The checkpoint covering this stream's highest seq, when one exists. has_checkpoint
+   * is false in v0 (no checkpoint is written yet) — verification is then bounded to
+   * this stream's internal consistency, which the panel states plainly.
+   *
+   * @generated from field: bool has_checkpoint = 5;
+   */
+  hasCheckpoint = false;
+
+  /**
+   * @generated from field: s4rciv.query.v1.VerificationCheckpoint checkpoint = 6;
+   */
+  checkpoint?: VerificationCheckpoint;
+
+  constructor(data?: PartialMessage<GetStreamVerificationResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetStreamVerificationResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "stream_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "source", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "alg_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "events", kind: "message", T: VerifiableEvent, repeated: true },
+    { no: 5, name: "has_checkpoint", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 6, name: "checkpoint", kind: "message", T: VerificationCheckpoint },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetStreamVerificationResponse {
+    return new GetStreamVerificationResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetStreamVerificationResponse {
+    return new GetStreamVerificationResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetStreamVerificationResponse {
+    return new GetStreamVerificationResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetStreamVerificationResponse | PlainMessage<GetStreamVerificationResponse> | undefined, b: GetStreamVerificationResponse | PlainMessage<GetStreamVerificationResponse> | undefined): boolean {
+    return proto3.util.equals(GetStreamVerificationResponse, a, b);
   }
 }
 
