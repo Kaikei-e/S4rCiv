@@ -6,7 +6,15 @@
 	let { data }: { data: PageData } = $props();
 	const law = $derived(data.law);
 
-	const indent = (t?: string) => (t === 'article' ? 0 : t === 'paragraph' ? 1 : 2);
+	// Indent depth. 号の細分 (subitem) share one flat node_type, so the イ→(1)→(ア) nesting
+	// depth is read from the eId (each level adds one __subitem segment).
+	const indent = (n: { nodeType?: string; eid?: string }) => {
+		if (n.nodeType === 'article') return 0;
+		if (n.nodeType === 'paragraph') return 1;
+		if (n.nodeType === 'item') return 2;
+		if (n.nodeType === 'subitem') return 2 + (n.eid?.match(/__subitem/g)?.length ?? 1);
+		return 2;
+	};
 	const sortedNodes = $derived([...data.nodes].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0)));
 	const repealed = $derived(law.repealStatus && law.repealStatus !== 'None');
 </script>
@@ -42,7 +50,7 @@
 		<h2 class="label">現行全文 <span class="cnt mono">{sortedNodes.length} ノード</span></h2>
 		<div class="tree">
 			{#each sortedNodes as n (n.eid)}
-				<div class="node" data-lv={indent(n.nodeType)} class:suppl={n.isSuppl}>
+				<div class="node" style="--lv: {indent(n)}" class:suppl={n.isSuppl}>
 					{#if n.num || n.caption}
 						<span class="num mono"
 							>{n.nodeType === 'article' ? '第' + n.num + '条' : n.num ?? ''}</span
@@ -113,14 +121,9 @@
 	}
 	.node {
 		padding: 4px 0;
+		padding-left: calc(var(--lv, 0) * 1.5em);
 		font-size: 14px;
 		line-height: 1.7;
-	}
-	.node[data-lv='1'] {
-		padding-left: 1.5em;
-	}
-	.node[data-lv='2'] {
-		padding-left: 3em;
 	}
 	.node.suppl {
 		border-left: 2px solid var(--hairline-2);
