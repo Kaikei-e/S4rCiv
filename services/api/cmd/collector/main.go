@@ -43,7 +43,35 @@ const (
 	collectorVersion = "S4rCiv-collect/0.1.0"
 	daemonInterval   = 60 * time.Second
 	pollBatch        = 100
+	// discoverInterval is how often the daemon refreshes the watch list in-process
+	// (ADR-000012). Much coarser than daemonInterval: new resources appear daily at
+	// most and source records carry a publish lag.
+	discoverInterval = 24 * time.Hour
+	// discoverWindowDays is the rolling look-back (by resource date) for date-windowed
+	// sources (kokkai meeting_list, egov 更新法令一覧). Wide enough to re-scan late-
+	// published records and absorb a multi-week daemon outage; upsert is idempotent so
+	// re-scanning is cheap and safe (ADR-000012). Long gaps still need a manual catch-up.
+	discoverWindowDays = 90
 )
+
+// recentScope is the rolling discover window [today-discoverWindowDays, today],
+// inclusive, in the YYYY-MM-DD form the date-windowed listers expect.
+func recentScope(now time.Time) port.ListScope {
+	return port.ListScope{
+		From:  now.AddDate(0, 0, -discoverWindowDays).Format("2006-01-02"),
+		Until: now.Format("2006-01-02"),
+	}
+}
+
+// logDiscover reports an auto-discover outcome without ever being fatal (the
+// daemon must keep polling even if a discover cycle fails).
+func logDiscover(source string, n int, err error) {
+	if err != nil {
+		log.Printf("auto-discover %s: %v", source, err)
+		return
+	}
+	log.Printf("auto-discover %s: upserted %d watches", source, n)
+}
 
 // pipeline abstracts the per-source command side (poll + project [+ diff]).
 type pipeline interface {
@@ -51,6 +79,12 @@ type pipeline interface {
 	cycle(ctx context.Context)
 	reproject(ctx context.Context) error
 	discover(ctx context.Context, args []string)
+	// autoDiscover refreshes the watch list in-daemon so new resources are
+	// followed without a manual discover (ADR-000012). It runs in the same
+	// process as cycle(), sharing the source's serial rate limiter (DISCIPLINE
+	// §1), so it never needs the daemon paused. It must not be fatal: a discover
+	// error is logged and the daemon keeps polling.
+	autoDiscover(ctx context.Context)
 }
 
 func main() {
@@ -232,6 +266,11 @@ func (k *kokkaiPipeline) discover(ctx context.Context, args []string) {
 	log.Printf("discover: upserted %d watches", n)
 }
 
+func (k *kokkaiPipeline) autoDiscover(ctx context.Context) {
+	n, err := k.collector.Discover(ctx, recentScope(time.Now()))
+	logDiscover(kokkai.SourceName, n, err)
+}
+
 // ── giin-roster pipeline ────────────────────────────────────────────────────
 
 type giinRosterPipeline struct {
@@ -272,6 +311,12 @@ func (g *giinRosterPipeline) discover(ctx context.Context, _ []string) {
 		log.Fatalf("discover: %v", err)
 	}
 	log.Printf("discover: upserted %d watches", n)
+}
+
+func (g *giinRosterPipeline) autoDiscover(ctx context.Context) {
+	// Fixed page set; re-discover daily to catch roster changes (e.g. after an election).
+	n, err := g.collector.Discover(ctx, port.ListScope{})
+	logDiscover(giinroster.SourceName, n, err)
 }
 
 // ── 参議院 pipelines (vote + roster) ─────────────────────────────────────────
@@ -333,6 +378,25 @@ func (p *sangiinVotePipeline) discover(ctx context.Context, _ []string) {
 	log.Printf("discover: upserted %d watches", len(refs))
 }
 
+func (p *sangiinVotePipeline) autoDiscover(ctx context.Context) {
+	// 記名投票 accrues within a session; re-discover daily so new roll-calls are followed.
+	refs, err := p.gw.DiscoverVotes(ctx)
+	if err != nil {
+		logDiscover(sangiin.SourceName, 0, err)
+		return
+	}
+	for _, r := range refs {
+		if err := p.control.UpsertWatch(ctx, port.Watch{
+			StreamID: r.StreamID, Source: sangiin.SourceName,
+			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
+		}); err != nil {
+			logDiscover(sangiin.SourceName, 0, fmt.Errorf("upsert %s: %w", r.StreamID, err))
+			return
+		}
+	}
+	logDiscover(sangiin.SourceName, len(refs), nil)
+}
+
 type sangiinRosterPipeline struct {
 	collector *collect.Collector
 	projector *project.RosterProjector
@@ -378,6 +442,23 @@ func (p *sangiinRosterPipeline) discover(ctx context.Context, _ []string) {
 		log.Fatalf("upsert watch: %v", err)
 	}
 	log.Printf("discover: upserted 1 watch (%s)", ref.CanonicalURL)
+}
+
+func (p *sangiinRosterPipeline) autoDiscover(ctx context.Context) {
+	// Single fixed roster page; re-discover daily to track membership changes.
+	ref, err := p.gw.DiscoverRoster(ctx)
+	if err != nil {
+		logDiscover(sangiin.RosterSourceName, 0, err)
+		return
+	}
+	if err := p.control.UpsertWatch(ctx, port.Watch{
+		StreamID: ref.StreamID, Source: sangiin.RosterSourceName,
+		SourceLocalKey: ref.SourceLocalKey, CanonicalURL: ref.CanonicalURL,
+	}); err != nil {
+		logDiscover(sangiin.RosterSourceName, 0, err)
+		return
+	}
+	logDiscover(sangiin.RosterSourceName, 1, nil)
 }
 
 // ── egov-law pipeline ───────────────────────────────────────────────────────
@@ -451,13 +532,28 @@ func (e *egovPipeline) discover(ctx context.Context, args []string) {
 	log.Printf("discover: upserted %d watches", n)
 }
 
+func (e *egovPipeline) autoDiscover(ctx context.Context) {
+	// 更新法令一覧 over the rolling window picks up newly enacted/amended laws
+	// (full backfill stays manual). Same path as `discover --updated`.
+	n, err := e.collector.DiscoverUpdated(ctx, recentScope(time.Now()))
+	logDiscover(egov.SourceName, n, err)
+}
+
 // ── shared driver ───────────────────────────────────────────────────────────
 
 func runDaemon(ctx context.Context, p pipeline) {
-	log.Printf("collector daemon started (source=%s, interval=%s)", p.source(), daemonInterval)
+	log.Printf("collector daemon started (source=%s, interval=%s, discover=%s)",
+		p.source(), daemonInterval, discoverInterval)
 	ticker := time.NewTicker(daemonInterval)
 	defer ticker.Stop()
+	// Zero value forces an autoDiscover on the first cycle so a fresh start (or a
+	// restart after downtime) refreshes the watch list before polling (ADR-000012).
+	var lastDiscover time.Time
 	for {
+		if time.Since(lastDiscover) >= discoverInterval {
+			p.autoDiscover(ctx)
+			lastDiscover = time.Now()
+		}
 		p.cycle(ctx)
 		select {
 		case <-ctx.Done():
