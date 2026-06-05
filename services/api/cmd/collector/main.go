@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -43,6 +44,11 @@ const (
 	collectorVersion = "S4rCiv-collect/0.1.0"
 	daemonInterval   = 60 * time.Second
 	pollBatch        = 100
+	// projectInterval bounds read-model latency independently of polling: the
+	// projector runs on this tick (catch-up phase) plus on an in-process signal
+	// after a poll emits events (live phase), so projection is never held hostage
+	// to a long poll batch (ADR-000015; catch-up-subscription pattern).
+	projectInterval = 10 * time.Second
 	// discoverInterval is how often the daemon refreshes the watch list in-process
 	// (ADR-000012). Much coarser than daemonInterval: new resources appear daily at
 	// most and source records carry a publish lag.
@@ -73,10 +79,17 @@ func logDiscover(source string, n int, err error) {
 	log.Printf("auto-discover %s: upserted %d watches", source, n)
 }
 
-// pipeline abstracts the per-source command side (poll + project [+ diff]).
+// pipeline abstracts the per-source command side. poll (command-in) and project
+// (read-model build) are separate so the daemon can run them on independent loops
+// (ADR-000015): a long poll batch must not block read-model projection.
 type pipeline interface {
 	source() string
-	cycle(ctx context.Context)
+	// poll fetches due watches and appends observation events; returns how many
+	// events were emitted (used to signal the project loop's live phase).
+	poll(ctx context.Context) int
+	// project folds new observation events into the read models [+ diffs]. Safe to
+	// run on its own cadence: the projector is checkpoint-based and idempotent.
+	project(ctx context.Context)
 	reproject(ctx context.Context) error
 	discover(ctx context.Context, args []string)
 	// autoDiscover refreshes the watch list in-daemon so new resources are
@@ -115,7 +128,8 @@ func main() {
 	case "run":
 		runDaemon(ctx, p)
 	case "poll-once":
-		p.cycle(ctx)
+		p.poll(ctx)
+		p.project(ctx)
 	case "reproject":
 		if err := p.reproject(ctx); err != nil {
 			log.Fatalf("reproject: %v", err)
@@ -226,19 +240,25 @@ type kokkaiPipeline struct {
 
 func (k *kokkaiPipeline) source() string { return kokkai.SourceName }
 
-func (k *kokkaiPipeline) cycle(ctx context.Context) {
+func (k *kokkaiPipeline) poll(ctx context.Context) int {
 	emitted, err := k.collector.PollOnce(ctx, kokkai.SourceName, pollBatch)
 	if err != nil {
 		log.Printf("poll: %v", err)
-	} else {
-		log.Printf("poll: emitted %d events", emitted)
+		return 0
 	}
+	log.Printf("poll: emitted %d events", emitted)
+	return emitted
+}
+
+func (k *kokkaiPipeline) project(ctx context.Context) {
 	projected, err := k.projector.Run(ctx)
 	if err != nil {
 		log.Printf("project: %v", err)
 		return
 	}
-	log.Printf("project: %d meetings", projected)
+	if projected > 0 {
+		log.Printf("project: %d meetings", projected)
+	}
 }
 
 func (k *kokkaiPipeline) reproject(ctx context.Context) error {
@@ -280,19 +300,25 @@ type giinRosterPipeline struct {
 
 func (g *giinRosterPipeline) source() string { return giinroster.SourceName }
 
-func (g *giinRosterPipeline) cycle(ctx context.Context) {
+func (g *giinRosterPipeline) poll(ctx context.Context) int {
 	emitted, err := g.collector.PollOnce(ctx, giinroster.SourceName, pollBatch)
 	if err != nil {
 		log.Printf("poll: %v", err)
-	} else {
-		log.Printf("poll: emitted %d events", emitted)
+		return 0
 	}
+	log.Printf("poll: emitted %d events", emitted)
+	return emitted
+}
+
+func (g *giinRosterPipeline) project(ctx context.Context) {
 	projected, err := g.projector.Run(ctx)
 	if err != nil {
 		log.Printf("project: %v", err)
 		return
 	}
-	log.Printf("project: %d roster pages", projected)
+	if projected > 0 {
+		log.Printf("project: %d roster pages", projected)
+	}
 }
 
 func (g *giinRosterPipeline) reproject(ctx context.Context) error {
@@ -338,19 +364,25 @@ type sangiinVotePipeline struct {
 
 func (p *sangiinVotePipeline) source() string { return sangiin.SourceName }
 
-func (p *sangiinVotePipeline) cycle(ctx context.Context) {
+func (p *sangiinVotePipeline) poll(ctx context.Context) int {
 	emitted, err := p.collector.PollOnce(ctx, sangiin.SourceName, pollBatch)
 	if err != nil {
 		log.Printf("poll: %v", err)
-	} else {
-		log.Printf("poll: emitted %d events", emitted)
+		return 0
 	}
+	log.Printf("poll: emitted %d events", emitted)
+	return emitted
+}
+
+func (p *sangiinVotePipeline) project(ctx context.Context) {
 	projected, err := p.projector.Run(ctx)
 	if err != nil {
 		log.Printf("project: %v", err)
 		return
 	}
-	log.Printf("project: %d vote pages", projected)
+	if projected > 0 {
+		log.Printf("project: %d vote pages", projected)
+	}
 }
 
 func (p *sangiinVotePipeline) reproject(ctx context.Context) error {
@@ -406,19 +438,25 @@ type sangiinRosterPipeline struct {
 
 func (p *sangiinRosterPipeline) source() string { return sangiin.RosterSourceName }
 
-func (p *sangiinRosterPipeline) cycle(ctx context.Context) {
+func (p *sangiinRosterPipeline) poll(ctx context.Context) int {
 	emitted, err := p.collector.PollOnce(ctx, sangiin.RosterSourceName, pollBatch)
 	if err != nil {
 		log.Printf("poll: %v", err)
-	} else {
-		log.Printf("poll: emitted %d events", emitted)
+		return 0
 	}
+	log.Printf("poll: emitted %d events", emitted)
+	return emitted
+}
+
+func (p *sangiinRosterPipeline) project(ctx context.Context) {
 	projected, err := p.projector.Run(ctx)
 	if err != nil {
 		log.Printf("project: %v", err)
 		return
 	}
-	log.Printf("project: %d roster pages", projected)
+	if projected > 0 {
+		log.Printf("project: %d roster pages", projected)
+	}
 }
 
 func (p *sangiinRosterPipeline) reproject(ctx context.Context) error {
@@ -471,25 +509,33 @@ type egovPipeline struct {
 
 func (e *egovPipeline) source() string { return egov.SourceName }
 
-func (e *egovPipeline) cycle(ctx context.Context) {
+func (e *egovPipeline) poll(ctx context.Context) int {
 	emitted, err := e.collector.PollOnce(ctx, egov.SourceName, pollBatch)
 	if err != nil {
 		log.Printf("poll: %v", err)
-	} else {
-		log.Printf("poll: emitted %d events", emitted)
+		return 0
 	}
+	log.Printf("poll: emitted %d events", emitted)
+	return emitted
+}
+
+func (e *egovPipeline) project(ctx context.Context) {
 	projected, err := e.projector.Run(ctx)
 	if err != nil {
 		log.Printf("project: %v", err)
 		return
 	}
-	log.Printf("project: %d laws", projected)
+	if projected > 0 {
+		log.Printf("project: %d laws", projected)
+	}
 	changes, err := e.differ.Run(ctx)
 	if err != nil {
 		log.Printf("diff: %v", err)
 		return
 	}
-	log.Printf("diff: %d changes", changes)
+	if changes > 0 {
+		log.Printf("diff: %d changes", changes)
+	}
 }
 
 func (e *egovPipeline) reproject(ctx context.Context) error {
@@ -541,26 +587,74 @@ func (e *egovPipeline) autoDiscover(ctx context.Context) {
 
 // ── shared driver ───────────────────────────────────────────────────────────
 
+// runDaemon runs the poll side and the project side as two independent loops
+// (ADR-000015). Polling is gated by the source's serial rate limit, so a large
+// backlog can take a long PollOnce; the project loop runs on its own tick (plus
+// an in-process wake when a poll emits events) so it folds events into the read
+// models as they are appended, never waiting for the whole poll batch.
 func runDaemon(ctx context.Context, p pipeline) {
-	log.Printf("collector daemon started (source=%s, interval=%s, discover=%s)",
-		p.source(), daemonInterval, discoverInterval)
-	ticker := time.NewTicker(daemonInterval)
-	defer ticker.Stop()
-	// Zero value forces an autoDiscover on the first cycle so a fresh start (or a
-	// restart after downtime) refreshes the watch list before polling (ADR-000012).
-	var lastDiscover time.Time
-	for {
-		if time.Since(lastDiscover) >= discoverInterval {
-			p.autoDiscover(ctx)
-			lastDiscover = time.Now()
+	log.Printf("collector daemon started (source=%s, poll=%s, project=%s, discover=%s)",
+		p.source(), daemonInterval, projectInterval, discoverInterval)
+
+	wake := make(chan struct{}, 1) // live-phase signal: a poll emitted new events
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	// Poll loop: refresh the watch list (daily), poll due watches, and wake the
+	// project loop when something was appended.
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(daemonInterval)
+		defer ticker.Stop()
+		// Zero value forces an autoDiscover on the first pass so a fresh start (or a
+		// restart after downtime) refreshes the watch list before polling (ADR-000012).
+		var lastDiscover time.Time
+		for {
+			if time.Since(lastDiscover) >= discoverInterval {
+				p.autoDiscover(ctx)
+				lastDiscover = time.Now()
+			}
+			if p.poll(ctx) > 0 {
+				nudge(wake)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
 		}
-		p.cycle(ctx)
-		select {
-		case <-ctx.Done():
-			log.Print("collector daemon stopping")
-			return
-		case <-ticker.C:
+	}()
+
+	// Project loop: catch-up subscription. Project once up front, then on each wake
+	// (live phase) or tick (catch-up / safety net). The projector is checkpoint-based
+	// and idempotent, so running it on its own cadence — concurrently with a long
+	// poll — is safe and converges.
+	go func() {
+		defer wg.Done()
+		ticker := time.NewTicker(projectInterval)
+		defer ticker.Stop()
+		for {
+			p.project(ctx)
+			select {
+			case <-ctx.Done():
+				return
+			case <-wake:
+			case <-ticker.C:
+			}
 		}
+	}()
+
+	wg.Wait()
+	log.Print("collector daemon stopping")
+}
+
+// nudge does a non-blocking send so the poll loop never blocks on a busy project
+// loop; a coalesced pending wake is enough (the projector folds all new events).
+func nudge(ch chan struct{}) {
+	select {
+	case ch <- struct{}{}:
+	default:
 	}
 }
 

@@ -26,3 +26,29 @@ func TestRecentScopeIsRolling90DayWindow(t *testing.T) {
 		t.Fatalf("max = %d, want 0 (no cap on auto-discover)", s.Max)
 	}
 }
+
+// nudge wakes the project loop without ever blocking the poll loop, coalescing
+// multiple pending wakes into one (ADR-000015).
+func TestNudgeNeverBlocksAndCoalesces(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	nudge(ch) // fills the buffer
+
+	done := make(chan struct{})
+	go func() { nudge(ch); close(done) }() // must not block on a full buffer
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("nudge blocked on a full channel")
+	}
+
+	select {
+	case <-ch:
+	default:
+		t.Fatal("expected one pending wake")
+	}
+	select {
+	case <-ch:
+		t.Fatal("expected wakes to coalesce to one")
+	default:
+	}
+}
