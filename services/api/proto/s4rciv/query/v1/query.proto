@@ -355,14 +355,21 @@ message ListTimelineRequest {
   string until = 5; // RFC3339, observed_at < until; "" = open
   string keyword = 6; // matches structured fields only (title/subtitle); never speech text (ADR-000006)
   int32 page_size = 7;
-  string page_token = 8; // opaque keyset cursor over seq
+  string page_token = 8; // opaque keyset cursor over seq: "b:<seq>" = older page, "a:<seq>" = newer page, "" = head (a bare "<seq>" is accepted as older, for back-compat)
   // NOTE: there is deliberately no person_id / speaker filter (anti-doxxing,
   // ADR-000004/000006). Per-legislator data is served only as a vote record.
 }
 
 message ListTimelineResponse {
   repeated TimelineItem items = 1;
-  string next_page_token = 2;
+  string next_page_token = 2; // older page (seq <); "" = no older page
+  string prev_page_token = 3; // newer page (seq >); "" = at head / no newer page
+  // total_count + page are for orientation only ("n / N ページ・全 X 件"). Keyset has
+  // no random page access, so these never enable a jump; page is derived from the
+  // count of rows newer than the current page's head (ADR-000006; research: keyset
+  // seek and arbitrary page jumps are mutually exclusive under filters).
+  int64 total_count = 4; // rows matching the filter; total pages = ceil(total_count / page_size)
+  int32 page = 5; // 1-based current page for display; 0 when the result is empty
 }
 
 // ── Per-legislator 記名投票 record (ADR-000006) ───────────────────────────────

@@ -19,6 +19,10 @@ export const load: PageServerLoad = async ({ url }) => {
 		return {
 			items: (res.items ?? []) as TimelineItem[],
 			nextPageToken: res.nextPageToken ?? '',
+			prevPageToken: res.prevPageToken ?? '',
+			totalCount: Number(res.totalCount ?? 0), // int64 arrives as a string
+			page: res.page ?? 0,
+			pageSize: 50,
 			filters,
 			error: null as string | null
 		};
@@ -26,6 +30,10 @@ export const load: PageServerLoad = async ({ url }) => {
 		return {
 			items: [] as TimelineItem[],
 			nextPageToken: '',
+			prevPageToken: '',
+			totalCount: 0,
+			page: 0,
+			pageSize: 50,
 			filters,
 			error: e instanceof Error ? e.message : 'タイムラインの取得に失敗しました'
 		};

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -255,6 +256,7 @@ func (h *Handler) ListTimeline(ctx context.Context, req *connect.Request[queryv1
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	cursorSeq, backward := parseTimelineCursor(req.Msg.GetPageToken())
 	f := port.TimelineFilter{
 		Source:         req.Msg.GetSource(),
 		EventType:      req.Msg.GetEventType(),
@@ -262,17 +264,58 @@ func (h *Handler) ListTimeline(ctx context.Context, req *connect.Request[queryv1
 		Since:          req.Msg.GetSince(),
 		Until:          req.Msg.GetUntil(),
 		Keyword:        req.Msg.GetKeyword(),
-		CursorSeq:      parseSeqToken(req.Msg.GetPageToken()),
-		Limit:          limit + 1, // keyset over-fetch to detect a next page
+		CursorSeq:      cursorSeq,
+		Backward:       backward,
+		Limit:          limit + 1, // keyset over-fetch to detect a further page in the walk direction
 	}
 	items, err := h.reader.ListTimeline(ctx, f)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
+
+	// The driver returns items newest-first (DESC) for both directions. The +1
+	// over-fetch sits on the far side of the walk: the oldest row for a forward
+	// (older) page, the newest row for a backward (newer) page. Drop it on the
+	// matching end so the page itself stays contiguous.
+	over := len(items) > limit
+	if over {
+		if backward {
+			items = items[1:] // extra newest row → a newer page exists
+		} else {
+			items = items[:limit] // extra oldest row → an older page exists
+		}
+	}
+
+	// Older (next, seq <) / newer (prev, seq >) existence. The over-fetch proves
+	// the walk side; the opposite side is implied by the cursor we arrived on — a
+	// "before" cursor means newer rows exist, an "after" cursor means older rows do.
+	olderExists, newerExists := over, cursorSeq != 0
+	if backward {
+		olderExists, newerExists = true, over
+	}
 	out := &queryv1.ListTimelineResponse{}
-	if len(items) > limit { // next page starts below the last returned seq
-		out.NextPageToken = strconv.FormatInt(items[limit-1].Seq, 10)
-		items = items[:limit]
+	if len(items) > 0 {
+		if olderExists {
+			out.NextPageToken = "b:" + strconv.FormatInt(items[len(items)-1].Seq, 10)
+		}
+		if newerExists {
+			out.PrevPageToken = "a:" + strconv.FormatInt(items[0].Seq, 10)
+		}
+	}
+	// Orientation only — keyset has no random page access (research-confirmed): the
+	// total feeds "全 X 件" / total pages, and the current page = (rows newer than
+	// this page's head)/pageSize + 1. A full filtered count, so once per request.
+	var aboveSeq int64
+	if len(items) > 0 {
+		aboveSeq = items[0].Seq
+	}
+	total, above, err := h.reader.CountTimeline(ctx, f, aboveSeq)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out.TotalCount = int64(total)
+	if len(items) > 0 {
+		out.Page = int32(above/limit + 1)
 	}
 	for _, it := range items {
 		out.Items = append(out.Items, toTimelineItem(it))
@@ -478,15 +521,26 @@ func toAttribution(a port.Attribution) *queryv1.Attribution {
 	}
 }
 
-func parseSeqToken(token string) int64 {
+// parseTimelineCursor decodes an opaque keyset page token into a seq cursor and a
+// walk direction. "b:<seq>" (or a bare "<seq>", for back-compat) walks older rows
+// (seq < cursor); "a:<seq>" walks newer rows (seq > cursor). An empty or malformed
+// token is the head page (cursor 0, forward).
+func parseTimelineCursor(token string) (seq int64, backward bool) {
 	if token == "" {
-		return 0
+		return 0, false
 	}
-	n, err := strconv.ParseInt(token, 10, 64)
+	s := token
+	switch {
+	case strings.HasPrefix(s, "a:"):
+		backward, s = true, s[2:]
+	case strings.HasPrefix(s, "b:"):
+		s = s[2:]
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil || n < 0 {
-		return 0
+		return 0, false
 	}
-	return n
+	return n, backward
 }
 
 func parseOffset(token string) int {

@@ -34,6 +34,7 @@ type TimelineFilter struct {
 	Keyword        string // structured-field match (title/subtitle); never speech text
 	Limit          int
 	CursorSeq      int64 // keyset cursor; 0 = first page (no upper bound)
+	Backward       bool  // false: older page (seq < cursor, seq DESC). true: newer page (seq > cursor, fetched ASC then reversed to DESC)
 }
 
 // TimelineItemView is one read-time-composed timeline row: the observation event
@@ -179,6 +180,11 @@ type QueryReader interface {
 	// 記名投票 summaries for it.
 	ListVoteEvents(ctx context.Context, f VoteEventFilter) (int, []VoteEventSummaryView, error)
 	ListTimeline(ctx context.Context, f TimelineFilter) ([]TimelineItemView, error)
+	// CountTimeline returns the total rows matching f (for "全 X 件" / page count) and
+	// the number matching but newer than aboveSeq (rows with seq > aboveSeq), which
+	// yields the current 1-based page = above/pageSize + 1. aboveSeq is the head
+	// (newest) seq of the page just fetched; pass 0 to count newer-than-nothing.
+	CountTimeline(ctx context.Context, f TimelineFilter, aboveSeq int64) (total, above int, err error)
 	VotesByPerson(ctx context.Context, personID string, limit, offset int) (LegislatorVotes, bool, error)
 	// 参議院 vote map (ADR-000010): list 記名投票 (session 0 = latest) and the per-都道府県
 	// 内訳 + 比例 panel + coverage for one vote.

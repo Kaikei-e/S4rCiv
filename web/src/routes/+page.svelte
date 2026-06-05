@@ -19,7 +19,12 @@
 	}
 
 	const feedHref = $derived(`/timeline.atom${qs()}`);
+	// Keyset pager over the immutable seq spine: prev = newer (seq >), next = older
+	// (seq <). An empty token means that end has no further page. total_count + page
+	// are orientation only — keyset has no random page jump (no clickable numbers).
+	const prevHref = $derived(data.prevPageToken ? qs({ page: data.prevPageToken }) || '?' : '');
 	const nextHref = $derived(data.nextPageToken ? qs({ page: data.nextPageToken }) || '?' : '');
+	const totalPages = $derived(Math.max(1, Math.ceil((data.totalCount || 0) / (data.pageSize || 50))));
 </script>
 
 <svelte:head>
@@ -80,7 +85,7 @@
 	<section class="panel" aria-label="横断タイムライン">
 		<div class="panel-head">
 			<span class="label">横断タイムライン</span>
-			<span class="count mono">{data.items.length} 件</span>
+			<span class="count mono">全 {data.totalCount.toLocaleString()} 件</span>
 		</div>
 
 		{#if data.error}
@@ -93,8 +98,20 @@
 					<ChangeLogItem {item} />
 				{/each}
 			</div>
-			{#if nextHref}
-				<a class="more" href={nextHref}>古い記録を読み込む →</a>
+			{#if prevHref || nextHref}
+				<nav class="pager" aria-label="ページ送り">
+					{#if prevHref}
+						<a class="pg" href={prevHref} rel="prev">← 新しい記録</a>
+					{:else}
+						<span class="pg disabled" aria-disabled="true">← 新しい記録</span>
+					{/if}
+					<span class="pg-count mono">{data.page} / {totalPages} ページ</span>
+					{#if nextHref}
+						<a class="pg" href={nextHref} rel="next">古い記録 →</a>
+					{:else}
+						<span class="pg disabled" aria-disabled="true">古い記録 →</span>
+					{/if}
+				</nav>
 			{/if}
 		{/if}
 	</section>
@@ -214,10 +231,36 @@
 	.state.error {
 		color: var(--st-critical-t);
 	}
-	.more {
-		display: inline-block;
-		margin-top: 14px;
+	.pager {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-top: 16px;
+		padding-top: 14px;
+		border-top: 1px solid var(--hairline-2);
+	}
+	.pg {
 		font-size: 13px;
+		padding: 6px 12px;
+		border: 1px solid var(--hairline-2);
+		border-radius: var(--r-sm);
+		text-decoration: none;
+		color: var(--text-2);
+		white-space: nowrap;
+	}
+	.pg:hover {
+		color: var(--accent);
+		border-color: var(--accent);
+	}
+	.pg.disabled {
+		color: var(--text-3);
+		opacity: 0.4;
+		cursor: default;
+	}
+	.pg-count {
+		font-size: 12px;
+		color: var(--text-3);
 	}
 	.foot {
 		margin-top: 20px;

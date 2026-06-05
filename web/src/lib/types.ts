@@ -47,7 +47,10 @@ export interface ListTimelineRequest {
 
 export interface ListTimelineResponse {
 	items?: TimelineItem[];
-	nextPageToken?: string;
+	nextPageToken?: string; // older page (seq <); "" = no older page
+	prevPageToken?: string; // newer page (seq >); "" = at head / no newer page
+	totalCount?: string; // int64 → JSON string; total rows matching the filter (total pages = ceil/page_size)
+	page?: number; // 1-based current page for "n / N ページ" display; 0 when empty
 }
 
 // ── Meeting detail (kokkai; full speeches, §7-safe) ─────────────────────────

@@ -2331,7 +2331,7 @@ export class ListTimelineRequest extends Message<ListTimelineRequest> {
   pageSize = 0;
 
   /**
-   * opaque keyset cursor over seq
+   * opaque keyset cursor over seq: "b:<seq>" = older page, "a:<seq>" = newer page, "" = head (a bare "<seq>" is accepted as older, for back-compat)
    *
    * @generated from field: string page_token = 8;
    */
@@ -2382,9 +2382,37 @@ export class ListTimelineResponse extends Message<ListTimelineResponse> {
   items: TimelineItem[] = [];
 
   /**
+   * older page (seq <); "" = no older page
+   *
    * @generated from field: string next_page_token = 2;
    */
   nextPageToken = "";
+
+  /**
+   * newer page (seq >); "" = at head / no newer page
+   *
+   * @generated from field: string prev_page_token = 3;
+   */
+  prevPageToken = "";
+
+  /**
+   * total_count + page are for orientation only ("n / N ページ・全 X 件"). Keyset has
+   * no random page access, so these never enable a jump; page is derived from the
+   * count of rows newer than the current page's head (ADR-000006; research: keyset
+   * seek and arbitrary page jumps are mutually exclusive under filters).
+   *
+   * rows matching the filter; total pages = ceil(total_count / page_size)
+   *
+   * @generated from field: int64 total_count = 4;
+   */
+  totalCount = protoInt64.zero;
+
+  /**
+   * 1-based current page for display; 0 when the result is empty
+   *
+   * @generated from field: int32 page = 5;
+   */
+  page = 0;
 
   constructor(data?: PartialMessage<ListTimelineResponse>) {
     super();
@@ -2396,6 +2424,9 @@ export class ListTimelineResponse extends Message<ListTimelineResponse> {
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "items", kind: "message", T: TimelineItem, repeated: true },
     { no: 2, name: "next_page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "prev_page_token", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "total_count", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 5, name: "page", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListTimelineResponse {

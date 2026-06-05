@@ -22,7 +22,15 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 	if f.Limit <= 0 {
 		f.Limit = 50
 	}
-	rows, err := q.pool.Query(ctx, `
+	// Keyset over the immutable seq spine. Forward (older) walks seq < cursor in
+	// DESC; backward (newer) walks seq > cursor ASC then reverses to DESC so the
+	// caller always sees newest-first. Text markers (not fmt verbs) keep the
+	// literal '%' in the ILIKE keyword filter intact.
+	cursorPred, order := "($1 = 0 OR e.seq < $1)", "DESC"
+	if f.Backward {
+		cursorPred, order = "e.seq > $1", "ASC"
+	}
+	sql := strings.NewReplacer("__CURSOR__", cursorPred, "__ORDER__", order).Replace(`
 		SELECT
 		  e.seq, e.type::text, e.source, e.stream_id, e.observed_at, e.source_published_at,
 		  encode(e.log_hash, 'hex'), encode(e.log_prev_hash, 'hex'),
@@ -41,7 +49,7 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		LEFT JOIN interpretation.meeting m           ON m.stream_id = e.stream_id
 		LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
 		LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
-		WHERE ($1 = 0 OR e.seq < $1)
+		WHERE __CURSOR__
 		  -- The timeline only shows the sources it can ENRICH with a headline read model
 		  -- (kokkai 会議録 / egov-law 法令). Vote-map support sources (giin-roster,
 		  -- sangiin-roster, sangiin-vote) are reference data surfaced via the 衆院/参院 maps,
@@ -55,8 +63,9 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		  AND (NULLIF($6,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($6,'')::timestamptz)
 		  AND ($7 = '' OR m.meeting_name ILIKE '%'||$7||'%' OR lw.law_title ILIKE '%'||$7||'%'
 		               OR lw.law_num ILIKE '%'||$7||'%' OR lw.category ILIKE '%'||$7||'%')
-		ORDER BY e.seq DESC
-		LIMIT $8`,
+		ORDER BY e.seq __ORDER__
+		LIMIT $8`)
+	rows, err := q.pool.Query(ctx, sql,
 		f.CursorSeq, f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, f.Limit)
 	if err != nil {
 		return nil, err
@@ -116,7 +125,49 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Backward pages are fetched ASC (the rows nearest above the cursor); flip to
+	// DESC so every page is newest-first regardless of navigation direction.
+	if f.Backward {
+		for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+			out[i], out[j] = out[j], out[i]
+		}
+	}
+	return out, nil
+}
+
+// CountTimeline computes the filter's total row count and how many of those rows
+// are newer than aboveSeq (seq > aboveSeq), mirroring ListTimeline's FROM/WHERE
+// exactly so the counts match the paged set. Keyset has no random page access, so
+// this feeds only the "n / N ページ・全 X 件" position display (ADR-000006). It is a
+// full filtered scan (unavoidable for an exact total); swap to an estimate
+// (pg_class.reltuples / EXPLAIN) if the log grows large enough to need it.
+func (q *QueryReader) CountTimeline(ctx context.Context, f port.TimelineFilter, aboveSeq int64) (int, int, error) {
+	var total, above int
+	err := q.pool.QueryRow(ctx, `
+		SELECT
+		  count(*),
+		  count(*) FILTER (WHERE e.seq > $7)
+		FROM observation.event e
+		LEFT JOIN interpretation.meeting m           ON m.stream_id = e.stream_id
+		LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
+		LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
+		WHERE e.source IN ('kokkai', 'egov-law')
+		  AND ($1 = '' OR e.source = $1)
+		  AND ($2 = '' OR e.type::text = $2)
+		  AND ($3 = '' OR c.classification = $3)
+		  AND (NULLIF($4,'')::timestamptz IS NULL OR e.observed_at >= NULLIF($4,'')::timestamptz)
+		  AND (NULLIF($5,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($5,'')::timestamptz)
+		  AND ($6 = '' OR m.meeting_name ILIKE '%'||$6||'%' OR lw.law_title ILIKE '%'||$6||'%'
+		               OR lw.law_num ILIKE '%'||$6||'%' OR lw.category ILIKE '%'||$6||'%')`,
+		f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, aboveSeq,
+	).Scan(&total, &above)
+	if err != nil {
+		return 0, 0, err
+	}
+	return total, above, nil
 }
 
 func meetingSubtitle(session int, house, issue, date string) string {
