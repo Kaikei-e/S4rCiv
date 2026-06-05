@@ -54,8 +54,13 @@ func StreamID(lawID string) string { return leg.LawStreamID(lawID) }
 func Permalink(lawID string) string { return "https://laws.e-gov.go.jp/law/" + lawID }
 
 // Fetch GETs the current in-force 法令標準XML for one law, C14N-canonicalizes it
-// and content-addresses it. Absence (404) is reported as not-present so it can be
-// recorded as ResourceVanished.
+// and content-addresses it. A missing full-text file does NOT by itself mean the
+// law vanished: e-Gov flips a law's current-revision pointer in its metadata
+// before publishing that revision's 法令標準XML, so law_data 404s (code 404004)
+// while the law is still in force. We therefore resolve a missing full text
+// against the authoritative existence signal (the /laws metadata endpoint) — the
+// law leaving the registry is a genuine ResourceVanished; the full text merely
+// lagging is ContentUnavailable (no event, re-poll soon). See ADR-000011.
 func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, error) {
 	q := url.Values{}
 	q.Set("law_full_text_format", "xml")
@@ -66,7 +71,7 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 		return port.FetchResult{}, err
 	}
 	if status == 404 {
-		return port.FetchResult{Present: false}, nil
+		return g.absenceOrPending(ctx, w.SourceLocalKey)
 	}
 	if status != 200 {
 		return port.FetchResult{}, fmt.Errorf("egov law_data: status %d", status)
@@ -77,7 +82,7 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 		return port.FetchResult{}, fmt.Errorf("decode law_data response: %w", err)
 	}
 	if resp.LawFullText == "" {
-		return port.FetchResult{Present: false}, nil
+		return g.absenceOrPending(ctx, w.SourceLocalKey)
 	}
 
 	rawXML, err := base64.StdEncoding.DecodeString(strings.TrimSpace(resp.LawFullText))
@@ -106,6 +111,46 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 		SourcePublishedAt: enforcementDateOf(resp.RevisionInfo.LawRevisionID),
 		Permalink:         Permalink(w.SourceLocalKey),
 	}, nil
+}
+
+// absenceOrPending resolves a missing law_data full text into either a genuine
+// absence (the law is gone from e-Gov's registry → ResourceVanished) or a
+// content-publishing lag (the law still exists in metadata but its current
+// revision's 法令標準XML is not published yet → ContentUnavailable, no event).
+// A vanish requires POSITIVE confirmation that the law left the registry; when
+// existence cannot be confirmed we error rather than fabricate an absence.
+func (g *Gateway) absenceOrPending(ctx context.Context, lawID string) (port.FetchResult, error) {
+	exists, err := g.lawExists(ctx, lawID)
+	if err != nil {
+		return port.FetchResult{}, fmt.Errorf("confirm law existence %s: %w", lawID, err)
+	}
+	if exists {
+		return port.FetchResult{ContentUnavailable: true}, nil
+	}
+	return port.FetchResult{Present: false}, nil
+}
+
+// lawExists reports whether the law is still listed in e-Gov's law registry (the
+// /laws metadata endpoint), independent of whether its full-text file is
+// retrievable. e-Gov returns 200 with total_count 0 for an unknown law_id, so a
+// non-200 status is treated as "cannot confirm" (error) rather than absence.
+func (g *Gateway) lawExists(ctx context.Context, lawID string) (bool, error) {
+	q := url.Values{}
+	q.Set("law_id", lawID)
+	q.Set("response_format", "json")
+
+	body, status, err := g.http.Get(ctx, "laws", q)
+	if err != nil {
+		return false, err
+	}
+	if status != 200 {
+		return false, fmt.Errorf("egov laws lookup: status %d", status)
+	}
+	var resp lawsResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return false, fmt.Errorf("decode laws lookup: %w", err)
+	}
+	return resp.TotalCount > 0 || len(resp.Laws) > 0, nil
 }
 
 // ParseLaw decodes canonical snapshot bytes into the normalized law domain.

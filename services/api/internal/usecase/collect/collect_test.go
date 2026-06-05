@@ -52,6 +52,7 @@ func (f *fakeFetcher) Fetch(context.Context, port.Watch) (port.FetchResult, erro
 type fakeControl struct {
 	due      []port.Watch
 	upserted []port.Watch
+	pending  []string // stream ids passed to MarkPending
 }
 
 func (c *fakeControl) Source(context.Context, string) (port.SourceConfig, error) {
@@ -65,6 +66,10 @@ func (c *fakeControl) UpsertWatch(_ context.Context, w port.Watch) error {
 	return nil
 }
 func (c *fakeControl) MarkPolled(context.Context, string, time.Time, time.Time, bool) error {
+	return nil
+}
+func (c *fakeControl) MarkPending(_ context.Context, streamID string, _, _ time.Time) error {
+	c.pending = append(c.pending, streamID)
 	return nil
 }
 
@@ -90,6 +95,8 @@ func present(s string) port.FetchResult {
 }
 
 func absent() port.FetchResult { return port.FetchResult{Present: false} }
+
+func contentUnavailable() port.FetchResult { return port.FetchResult{ContentUnavailable: true} }
 
 func newCollector(log port.EventLog, f port.ResourceFetcher, ctrl port.ControlStore, l port.MeetingLister) *Collector {
 	return New(log, f, ctrl, l, &fakeClock{t: time.Unix(1_700_000_000, 0).UTC()}, &fakeIDs{}, Config{FetcherVersion: "test/0.1.0"})
@@ -137,6 +144,49 @@ func TestPollStreamLifecycle(t *testing.T) {
 	}
 	if got[2].PrevContentHash == nil {
 		t.Fatal("vanished should link to the pre-vanish snapshot in the content chain")
+	}
+}
+
+// A Resource that exists but whose snapshot is not published yet (e-Gov content
+// lag) must never be recorded as ResourceVanished: it emits no event, schedules
+// a re-poll, and when the content finally appears it is a plain ResourceChanged —
+// not a Vanished→Restored pair polluting the immutable log. (Regression for the
+// false-vanish bug: law amended today, new-revision XML not yet published.)
+func TestPollStreamContentUnavailableNeverVanishes(t *testing.T) {
+	log := newFakeLog()
+	ctrl := &fakeControl{}
+	fetch := &fakeFetcher{results: []port.FetchResult{
+		present("A"),         // observed
+		contentUnavailable(), // exists, snapshot not published yet -> no emit
+		contentUnavailable(), // still lagging -> no emit
+		present("B"),         // new content published -> ResourceChanged
+	}}
+	c := newCollector(log, fetch, ctrl, fakeLister{})
+	w := port.Watch{StreamID: "egov-law:X", Source: "egov-law", SourceLocalKey: "X"}
+
+	wantEmit := []bool{true, false, false, true}
+	for i, we := range wantEmit {
+		ok, err := c.PollStream(context.Background(), w)
+		if err != nil {
+			t.Fatalf("poll %d: %v", i, err)
+		}
+		if ok != we {
+			t.Fatalf("poll %d: emit=%v want %v", i, ok, we)
+		}
+	}
+
+	got := log.events["egov-law:X"]
+	wantTypes := []obs.EventType{obs.ResourceObserved, obs.ResourceChanged}
+	if len(got) != len(wantTypes) {
+		t.Fatalf("emitted %d events, want %d (no Vanished)", len(got), len(wantTypes))
+	}
+	for i, wt := range wantTypes {
+		if got[i].Type != wt {
+			t.Fatalf("event %d type = %v, want %v", i, got[i].Type, wt)
+		}
+	}
+	if len(ctrl.pending) != 2 {
+		t.Fatalf("MarkPending called %d times, want 2 (one per content-unavailable poll)", len(ctrl.pending))
 	}
 }
 

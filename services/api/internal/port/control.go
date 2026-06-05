@@ -32,4 +32,10 @@ type ControlStore interface {
 	UpsertWatch(ctx context.Context, w Watch) error
 	// MarkPolled advances the poll cursor and backoff for a stream.
 	MarkPolled(ctx context.Context, streamID string, polledAt, nextDue time.Time, ok bool) error
+	// MarkPending records a poll that found the Resource present-but-without a
+	// retrievable snapshot (FetchResult.ContentUnavailable). It advances the poll
+	// cursor and schedules a soon re-poll at retryAt WITHOUT incrementing the
+	// failure counter — this is not a fetch failure, the snapshot is simply not
+	// published yet.
+	MarkPending(ctx context.Context, streamID string, polledAt, retryAt time.Time) error
 }

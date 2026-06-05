@@ -120,14 +120,80 @@ func TestFetchProducesStableSnapshot(t *testing.T) {
 	}
 }
 
-func TestFetchVanishedOn404(t *testing.T) {
-	g := New(fakeGetter{status: 404})
+// lawsBody builds a /laws metadata response listing `count` laws (the existence
+// oracle: total_count>0 means the law is still in the registry).
+func lawsBody(t *testing.T, count int) []byte {
+	t.Helper()
+	laws := make([]any, count)
+	for i := range laws {
+		laws[i] = map[string]any{"law_info": map[string]any{"law_id": "x"}}
+	}
+	b, err := json.Marshal(map[string]any{"total_count": count, "count": count, "laws": laws})
+	if err != nil {
+		t.Fatalf("marshal laws: %v", err)
+	}
+	return b
+}
+
+// A law_data 404 while /laws confirms the law is gone (total_count 0) is a
+// genuine absence → ResourceVanished.
+func TestFetchVanishedWhenLawAbsentFromRegistry(t *testing.T) {
+	g := New(fakeGetter{bodies: map[string][]byte{"laws": lawsBody(t, 0)}}) // law_data absent -> 404
+	r, err := g.Fetch(context.Background(), port.Watch{SourceLocalKey: "x"})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if r.Present || r.ContentUnavailable {
+		t.Fatalf("absent law must be not-present and not content-unavailable: %+v", r)
+	}
+}
+
+// A law_data 404 while /laws still lists the law (e-Gov flipped the revision
+// pointer before publishing the new XML) is NOT a vanish — it is ContentUnavailable.
+func TestFetchContentUnavailableWhenStillInRegistry(t *testing.T) {
+	g := New(fakeGetter{bodies: map[string][]byte{"laws": lawsBody(t, 1)}}) // law_data absent -> 404
 	r, err := g.Fetch(context.Background(), port.Watch{SourceLocalKey: "x"})
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
 	if r.Present {
-		t.Fatal("404 must report not present (-> ResourceVanished)")
+		t.Fatal("content lag must not report Present")
+	}
+	if !r.ContentUnavailable {
+		t.Fatal("law still in registry but no full text must be ContentUnavailable (not a vanish)")
+	}
+}
+
+// A 200 with an empty law_full_text resolves through the same oracle: still in
+// the registry → ContentUnavailable, not a vanish.
+func TestFetchEmptyFullTextWithLawPresentIsContentUnavailable(t *testing.T) {
+	empty, _ := json.Marshal(map[string]any{
+		"law_info":      map[string]any{"law_id": "x"},
+		"law_full_text": "",
+	})
+	g := New(fakeGetter{bodies: map[string][]byte{
+		"law_data": empty,
+		"laws":     lawsBody(t, 1),
+	}})
+	r, err := g.Fetch(context.Background(), port.Watch{SourceLocalKey: "x"})
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if r.Present || !r.ContentUnavailable {
+		t.Fatalf("empty full text with law present must be ContentUnavailable: %+v", r)
+	}
+}
+
+// When existence cannot be confirmed (the /laws lookup itself errors with a
+// non-200), Fetch errors rather than fabricating an absence — a vanish requires
+// positive confirmation.
+func TestFetchErrorsWhenExistenceUnconfirmed(t *testing.T) {
+	// law_data is absent (404) and the /laws existence lookup returns a non-200,
+	// so existence cannot be confirmed.
+	g := New(fakeGetter{bodies: map[string][]byte{"laws": lawsBody(t, 1)}, status: 500})
+	_, err := g.Fetch(context.Background(), port.Watch{SourceLocalKey: "x"})
+	if err == nil {
+		t.Fatal("unconfirmed existence must error, not silently vanish")
 	}
 }
 

@@ -8,13 +8,27 @@ import (
 )
 
 // FetchResult is one observation of a watched Resource. Present=false means the
-// resource was absent (404/removed) this cycle — recorded as ResourceVanished
+// resource was absent (confirmed gone) this cycle — recorded as ResourceVanished
 // (silence is information; DISCIPLINE §3).
+//
+// Present and ContentUnavailable are distinct signals: existence is whether the
+// Resource is still listed by the source's authoritative metadata, content is
+// whether a retrievable snapshot exists. A missing content artifact while the
+// Resource still exists is ContentUnavailable, NOT absence — see below.
 type FetchResult struct {
 	Present           bool
 	Snapshot          *Snapshot // canonical content to record; nil when absent
 	SourcePublishedAt *time.Time
 	Permalink         string
+
+	// ContentUnavailable means the Resource still exists at the source (confirmed
+	// via authoritative metadata) but no retrievable snapshot is published yet —
+	// e.g. e-Gov has switched a law's current-revision pointer but has not yet
+	// published that revision's 法令標準XML, so law_data 404s while /laws still
+	// lists the law. The collector emits NO event and re-polls soon; this must
+	// never be read as ResourceVanished (DISCIPLINE §4-3: never write an absence
+	// that did not happen into the immutable log). Mutually exclusive with Present.
+	ContentUnavailable bool
 }
 
 // ResourceFetcher fetches one Resource over the source's read-only HTTP boundary.

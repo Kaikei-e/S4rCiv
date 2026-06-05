@@ -23,13 +23,15 @@ type Collector struct {
 
 	fetcherVersion string
 	pollCadence    time.Duration // how long until a stream is polled again
+	pendingRetry   time.Duration // shorter re-poll when content is not published yet
 	source         string        // the source this collector discovers/upserts watches for
 }
 
 type Config struct {
 	FetcherVersion string
 	PollCadence    time.Duration
-	Source         string // source id stamped on discovered watches (default "kokkai")
+	PendingRetry   time.Duration // re-poll delay for ContentUnavailable (default 3h)
+	Source         string        // source id stamped on discovered watches (default "kokkai")
 }
 
 func New(
@@ -39,13 +41,17 @@ func New(
 	if cfg.PollCadence <= 0 {
 		cfg.PollCadence = 24 * time.Hour
 	}
+	if cfg.PendingRetry <= 0 {
+		cfg.PendingRetry = 3 * time.Hour
+	}
 	if cfg.Source == "" {
 		cfg.Source = "kokkai"
 	}
 	return &Collector{
 		log: log, fetcher: fetcher, control: control, lister: lister,
 		clock: clock, ids: ids,
-		fetcherVersion: cfg.FetcherVersion, pollCadence: cfg.PollCadence, source: cfg.Source,
+		fetcherVersion: cfg.FetcherVersion, pollCadence: cfg.PollCadence,
+		pendingRetry: cfg.PendingRetry, source: cfg.Source,
 	}
 }
 
@@ -86,6 +92,16 @@ func (c *Collector) PollStream(ctx context.Context, w port.Watch) (bool, error) 
 	if err != nil {
 		return false, fmt.Errorf("fetch: %w", err)
 	}
+
+	if res.ContentUnavailable {
+		// The Resource still exists at the source but no snapshot is published yet
+		// (e.g. e-Gov switched a law's current-revision pointer before publishing
+		// that revision's 法令標準XML). Emit nothing and re-poll soon — never feed
+		// Decide an absence it would misread as ResourceVanished (DISCIPLINE §4-3:
+		// don't write an absence that did not happen into the immutable log).
+		return false, c.control.MarkPending(ctx, w.StreamID, c.clock.Now(), c.pendingRetryAt())
+	}
+
 	state, err := c.log.StreamState(ctx, w.StreamID)
 	if err != nil {
 		return false, fmt.Errorf("stream state: %w", err)
@@ -141,3 +157,7 @@ func (c *Collector) Discover(ctx context.Context, scope port.ListScope) (int, er
 }
 
 func (c *Collector) nextDue() time.Time { return c.clock.Now().Add(c.pollCadence) }
+
+// pendingRetryAt is the (shorter) next-poll time used when a Resource exists but
+// its snapshot is not published yet — captures freshly-amended content promptly.
+func (c *Collector) pendingRetryAt() time.Time { return c.clock.Now().Add(c.pendingRetry) }

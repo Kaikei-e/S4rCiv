@@ -81,6 +81,23 @@ func (c *ControlStore) MarkPolled(ctx context.Context, streamID string, polledAt
 	return err
 }
 
+// MarkPending schedules a soon re-poll for a Resource that exists but whose
+// snapshot is not published yet (e-Gov content-publishing lag). It does NOT
+// touch consecutive_failures — a content lag is not a failure — and clears any
+// backoff so the next_due_at (retryAt) alone gates the re-poll.
+func (c *ControlStore) MarkPending(ctx context.Context, streamID string, polledAt, retryAt time.Time) error {
+	_, err := c.pool.Exec(ctx, `
+		INSERT INTO control.poll_state
+			(stream_id, last_polled_at, next_due_at, backoff_until, consecutive_failures)
+		VALUES ($1, $2, $3, NULL, 0)
+		ON CONFLICT (stream_id) DO UPDATE SET
+			last_polled_at = EXCLUDED.last_polled_at,
+			next_due_at = EXCLUDED.next_due_at,
+			backoff_until = NULL`,
+		streamID, polledAt, retryAt)
+	return err
+}
+
 func backoffArg(ok bool, nextDue time.Time) any {
 	if ok {
 		return nil
