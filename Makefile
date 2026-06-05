@@ -14,7 +14,15 @@
 # Every DB-touching layer uses the real Postgres from compose.yaml — the same image,
 # migrations and wiring as production — so tests never diverge from the real stack.
 
-COMPOSE := docker compose -f compose.yaml -f compose.test.yaml
+# ISOLATION (see ADR-000016 / 2026-06-06 incident): every test command runs under a
+# SEPARATE Compose project (s4rciv-test) with its own volume (s4rciv-test_db_data) and
+# its own host ports. The production `s4rciv` stack and its db_data volume are never
+# touched — so even `down -v` below can only remove TEST volumes. compose.test.yaml
+# also sets `name: s4rciv-test`, making this safe even if -p were omitted.
+TEST_PROJECT := s4rciv-test
+export API_HOST_PORT ?= 18080
+export WEB_HOST_PORT ?= 13000
+COMPOSE := docker compose -p $(TEST_PROJECT) -f compose.yaml -f compose.test.yaml
 BASELINE_REF ?= origin/main
 
 .PHONY: test unit cdc integration e2e \
@@ -71,12 +79,12 @@ seed: ## Deterministically seed the E2E database (fixed inputs → reproducible 
 	$(COMPOSE) run --rm seed
 
 e2e: up seed ## Playwright browser journeys vs the running, seeded stack
-	cd web && pnpm exec playwright test; \
+	cd web && E2E_BASE_URL=http://127.0.0.1:$(WEB_HOST_PORT) pnpm exec playwright test; \
 	  s=$$?; $(MAKE) down; exit $$s
 
 ## ---- lifecycle ----------------------------------------------------------------
 
-down: ## Stop the stack and remove volumes/orphans
+down: ## Stop the test stack and remove its volumes (s4rciv-test project ONLY — never prod)
 	-$(COMPOSE) down -v --remove-orphans
 
 clean: down ## Teardown + drop built test images

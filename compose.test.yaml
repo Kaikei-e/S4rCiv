@@ -16,6 +16,15 @@
 #   - web/api/db  : inherited from compose.yaml, brought up for browser E2E.
 #
 # db is NOT host-published (compose.yaml), so seeding runs INSIDE the network here.
+#
+# SAFETY — ISOLATED PROJECT: this overlay redefines the Compose project name to
+# `s4rciv-test`. The project name overrides compose.yaml's `name: s4rciv` and
+# prefixes every volume/network/container, so the test db volume is
+# `s4rciv-test_db_data`, NOT the production `s4rciv_db_data`. Therefore
+# `docker compose -f compose.yaml -f compose.test.yaml down -v` can only ever
+# remove TEST volumes — it can never touch production data. (A 2026-06-06 incident
+# destroyed s4rciv_db_data because this overlay used to share the prod project.)
+name: s4rciv-test
 
 services:
   # Park the command-side daemons during tests: their independent project loop
