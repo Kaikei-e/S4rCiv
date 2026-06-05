@@ -209,6 +209,86 @@ fn caption_only_change_is_administrative() {
     assert_eq!(result.confidence, Confidence::High);
 }
 
+/// A 定義条 like 第14条: para 1 carries an item whose sub-clauses live in
+/// <Subitem1>/<Subitem2>, and para 2 carries 用語定義 items whose term + 意義 sit in two
+/// <Column>s. Pins the Subitem eId scheme + the 全角スペース sentence-join (ADR-000013).
+fn definition_law() -> &'static str {
+    r#"<Law><LawBody><MainProvision>
+      <Article Num="14">
+        <ArticleCaption>（定義）</ArticleCaption>
+        <ArticleTitle>第十四条</ArticleTitle>
+        <Paragraph Num="1">
+          <ParagraphSentence><Sentence>本文である。</Sentence><Sentence>ただし、例外がある。</Sentence></ParagraphSentence>
+          <Item Num="2">
+            <ItemTitle>二</ItemTitle>
+            <ItemSentence><Sentence>次に掲げる額の合算額</Sentence></ItemSentence>
+            <Subitem1 Num="1"><Subitem1Title>イ</Subitem1Title><Subitem1Sentence><Sentence>イに掲げる額</Sentence></Subitem1Sentence></Subitem1>
+            <Subitem1 Num="2"><Subitem1Title>ロ</Subitem1Title><Subitem1Sentence><Sentence>ロに掲げる額</Sentence></Subitem1Sentence>
+              <Subitem2 Num="1"><Subitem2Title>（１）</Subitem2Title><Subitem2Sentence><Sentence>（１）に掲げる率</Sentence></Subitem2Sentence></Subitem2>
+            </Subitem1>
+          </Item>
+        </Paragraph>
+        <Paragraph Num="2">
+          <ParagraphSentence><Sentence>この条において用語の意義は次のとおり。</Sentence></ParagraphSentence>
+          <Item Num="1"><ItemTitle>一</ItemTitle>
+            <ItemSentence><Column><Sentence>みなし計算対象期間</Sentence></Column><Column><Sentence>所定の期間をいう。</Sentence></Column></ItemSentence>
+          </Item>
+        </Paragraph>
+      </Article>
+    </MainProvision></LawBody></Law>"#
+}
+
+#[test]
+fn column_and_subitem_eids_and_join_match_contract() {
+    let law = xmlmodel::parse(definition_law().as_bytes()).expect("parse definition law");
+
+    // Sub-clauses materialize with depth-tagged eIds parented to the item / outer subitem.
+    assert_eq!(
+        law.nodes["art_14__para_1__item_2__subitem1_1"].node_type,
+        NodeType::Subitem
+    );
+    assert_eq!(
+        law.nodes["art_14__para_1__item_2__subitem1_1"].sentence_text,
+        "イに掲げる額"
+    );
+    assert_eq!(
+        law.nodes["art_14__para_1__item_2__subitem1_2__subitem2_1"].parent_eid,
+        "art_14__para_1__item_2__subitem1_2"
+    );
+    assert_eq!(
+        law.nodes["art_14__para_1__item_2__subitem1_2__subitem2_1"].sentence_text,
+        "（１）に掲げる率"
+    );
+
+    // 本文＋ただし書 and 用語/意義 both join with the canonical 全角スペース.
+    assert_eq!(
+        law.nodes["art_14__para_1"].sentence_text,
+        "本文である。　ただし、例外がある。"
+    );
+    assert_eq!(
+        law.nodes["art_14__para_2__item_1"].sentence_text,
+        "みなし計算対象期間　所定の期間をいう。"
+    );
+}
+
+#[test]
+fn modifying_a_subitem_sentence_is_substantive() {
+    let modified = definition_law().replace("（１）に掲げる率", "（１）に掲げる割合");
+    let prev = xmlmodel::parse(definition_law().as_bytes()).unwrap();
+    let curr = xmlmodel::parse(modified.as_bytes()).unwrap();
+    let result = diff::compute(&prev, &curr);
+
+    let change = result
+        .changes
+        .iter()
+        .find(|c| c.eid == "art_14__para_1__item_2__subitem1_2__subitem2_1")
+        .expect("subitem change should be reported");
+    assert_eq!(change.op, ChangeOp::Modified);
+    assert_eq!(change.node_type, NodeType::Subitem);
+    // 号の細分の実質変更は substantive — administrative に飲み込まれてはならない。
+    assert_eq!(result.classification, Classification::Substantive);
+}
+
 #[test]
 fn deleting_an_article_is_substantive() {
     // Drop article 8 entirely.

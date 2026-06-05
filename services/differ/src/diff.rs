@@ -169,12 +169,14 @@ fn moved(prev: &Node, curr: &Node) -> NodeChange {
 }
 
 /// A change is normative when it adds, removes, or alters the sentence_text of an
-/// article/paragraph/item. ADDED/DELETED of a text-bearing node count; an ADDED node
-/// with empty text (e.g. a paragraph-less article that only had a caption) does not.
+/// article/paragraph/item/subitem. ADDED/DELETED of a text-bearing node count; an ADDED
+/// node with empty text (e.g. a paragraph-less article that only had a caption) does not.
+/// 号の細分 (subitem イ/ロ/(1)(2)…) carry substantive text — a change there must surface
+/// as substantive, not be silently swallowed as administrative (ADR-000013).
 fn is_normative(c: &NodeChange) -> bool {
     let bearing = matches!(
         c.node_type,
-        NodeType::Article | NodeType::Paragraph | NodeType::Item
+        NodeType::Article | NodeType::Paragraph | NodeType::Item | NodeType::Subitem
     );
     if !bearing {
         return false;

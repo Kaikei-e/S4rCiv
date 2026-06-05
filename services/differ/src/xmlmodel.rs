@@ -8,17 +8,23 @@
 //! - Article   → `art_{Num}`                       (Num verbatim, `_` for 枝番 e.g. `9_2`)
 //! - Paragraph → `{article_eid}__para_{Num}`        (Num defaults to 1-based ordinal)
 //! - Item      → `{paragraph_eid}__item_{Num}`
+//! - Subitem   → `{parent_eid}__subitem{level}_{Num}` (号の細分 イ/ロ/(1)(2)…; the
+//!   `<Subitem{level}>` depth flows into the eId, e.g. `…__item_2__subitem1_2__subitem2_1`)
 //! - 附則      → every node under the k-th `<SupplProvision>` (1-based among
 //!   siblings) gets the prefix `suppl_{k}__`, e.g. `suppl_1__art_3__para_1`.
 //!
-//! `node_type` is one of `article` | `paragraph` | `item`. `sentence_text` is the
-//! node's directly-owned `<Sentence>` text:
+//! `node_type` is one of `article` | `paragraph` | `item` | `subitem`. `sentence_text`
+//! is the node's directly-owned text, joining adjacent `<Sentence>`s with the canonical
+//! 全角スペース (U+3000) and descending into `<Column>` (用語定義号 split the term and
+//! its 意義 across two `<Column>`s). This text-join + the Subitem eId scheme are a SHARED
+//! CONTRACT with the Go projector (ADR-000013) and must stay byte-identical.
 //! - paragraph: the sentences inside its own `<ParagraphSentence>`,
 //! - item: the sentences inside its own `<ItemSentence>`,
+//! - subitem: the sentences inside its own `<Subitem{level}Sentence>`,
 //! - article with no paragraphs: its body text excluding `<ArticleCaption>`.
 //!
-//! `Num` is an XML attribute on `<Article>` / `<Paragraph>` / `<Item>` in the law
-//! standard; we read it off the start tag. 枝番 such as 第9条の2 appear as
+//! `Num` is an XML attribute on `<Article>` / `<Paragraph>` / `<Item>` / `<Subitem{n}>`
+//! in the law standard; we read it off the start tag. 枝番 such as 第9条の2 appear as
 //! `Num="9_2"` and flow into the eId verbatim.
 
 use std::collections::BTreeMap;
@@ -49,6 +55,7 @@ pub enum NodeType {
     Article,
     Paragraph,
     Item,
+    Subitem,
 }
 
 impl NodeType {
@@ -57,9 +64,15 @@ impl NodeType {
             Self::Article => "article",
             Self::Paragraph => "paragraph",
             Self::Item => "item",
+            Self::Subitem => "subitem",
         }
     }
 }
+
+/// The canonical separator between adjacent `<Sentence>`s owned by one node — the
+/// shared sentence-join contract with the Go projector (ADR-000013). Must match
+/// `legislative.sentenceJoin` byte-for-byte.
+const SENTENCE_JOIN: char = '　'; // 全角スペース (U+3000)
 
 /// The result of parsing one snapshot.
 #[derive(Debug, Default)]
@@ -214,6 +227,7 @@ enum TextSink {
     ArticleCaption,
     ParagraphSentence,
     ItemSentence,
+    SubitemSentence,
 }
 
 /// Streaming state machine that turns SAX-style events into the node map.
@@ -232,6 +246,8 @@ struct Builder {
     cur_article: Option<OpenArticle>,
     cur_paragraph: Option<OpenParagraph>,
     cur_item: Option<OpenItem>,
+    /// Open 号の細分 stack (innermost last), so <Subitem2> nests under <Subitem1>.
+    cur_subitems: Vec<OpenSubitem>,
 
     /// Whether the current article has emitted at least one paragraph; if not,
     /// the article owns body text directly.
@@ -263,6 +279,15 @@ struct OpenItem {
     num: String,
     text: String,
     ordinal: usize,
+    subitem_ordinal: usize,
+}
+
+struct OpenSubitem {
+    eid: String,
+    num: String,
+    text: String,
+    ordinal: usize,
+    child_ordinal: usize,
 }
 
 impl Builder {
@@ -335,11 +360,23 @@ impl Builder {
                         num,
                         text: String::new(),
                         ordinal,
+                        subitem_ordinal: 0,
                     });
                 }
             }
             "ItemSentence" => self.sink = TextSink::ItemSentence,
-            _ => {}
+            // Adjacent sentences within one node join with the 全角スペース; insert it
+            // when a new <Sentence> opens on top of already-captured text (ADR-000013).
+            "Sentence" => self.insert_sentence_join(),
+            _ => {
+                if is_subitem_sentence(name) {
+                    self.sink = TextSink::SubitemSentence;
+                } else if is_subitem_title(name) {
+                    self.sink = TextSink::Discard;
+                } else if let Some(level) = subitem_level(name) {
+                    self.open_subitem(level, num);
+                }
+            }
         }
     }
 
@@ -404,7 +441,13 @@ impl Builder {
                     });
                 }
             }
-            _ => {}
+            _ => {
+                if is_subitem_sentence(name) || is_subitem_title(name) {
+                    self.sink = TextSink::None;
+                } else if subitem_level(name).is_some() {
+                    self.close_subitem();
+                }
+            }
         }
     }
 
@@ -438,6 +481,77 @@ impl Builder {
                     i.text.push_str(text);
                 }
             }
+            TextSink::SubitemSentence => {
+                if let Some(s) = self.cur_subitems.last_mut() {
+                    s.text.push_str(text);
+                }
+            }
+        }
+    }
+
+    /// On a new `<Sentence>` opening, push the canonical join separator if the active
+    /// sink already holds text — so two `<Sentence>`s (incl. across `<Column>`s) join
+    /// with one 全角スペース, matching the Go projector's `joined()`.
+    fn insert_sentence_join(&mut self) {
+        let buf = match self.sink {
+            TextSink::ParagraphSentence => self.cur_paragraph.as_mut().map(|p| &mut p.text),
+            TextSink::ItemSentence => self.cur_item.as_mut().map(|i| &mut i.text),
+            TextSink::SubitemSentence => self.cur_subitems.last_mut().map(|s| &mut s.text),
+            _ => None,
+        };
+        if let Some(buf) = buf {
+            if !buf.is_empty() {
+                buf.push(SENTENCE_JOIN);
+            }
+        }
+    }
+
+    /// Open a 号の細分. Its parent is the innermost open subitem, else the current item.
+    fn open_subitem(&mut self, level: usize, num: Option<String>) {
+        let (parent_eid, default_num) = if let Some(top) = self.cur_subitems.last_mut() {
+            top.child_ordinal += 1;
+            (top.eid.clone(), top.child_ordinal)
+        } else if let Some(item) = self.cur_item.as_mut() {
+            item.subitem_ordinal += 1;
+            (item.eid.clone(), item.subitem_ordinal)
+        } else {
+            // A subitem outside any item is malformed; flag degraded and skip it.
+            self.law.degraded = true;
+            return;
+        };
+        let num = num
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| default_num.to_string());
+        let eid = format!("{parent_eid}__subitem{level}_{}", normalize_num(&num));
+        let ordinal = self.next_ordinal();
+        self.cur_subitems.push(OpenSubitem {
+            eid,
+            num,
+            text: String::new(),
+            ordinal,
+            child_ordinal: 0,
+        });
+    }
+
+    /// Close the innermost open subitem, linking it to its parent (the next subitem on
+    /// the stack, else the current item).
+    fn close_subitem(&mut self) {
+        if let Some(sub) = self.cur_subitems.pop() {
+            let parent_eid = self
+                .cur_subitems
+                .last()
+                .map(|s| s.eid.clone())
+                .or_else(|| self.cur_item.as_ref().map(|i| i.eid.clone()))
+                .unwrap_or_default();
+            self.push(Node {
+                eid: sub.eid,
+                node_type: NodeType::Subitem,
+                num: sub.num,
+                sentence_text: sub.text.trim().to_string(),
+                caption: String::new(),
+                parent_eid,
+                ordinal: sub.ordinal,
+            });
         }
     }
 
@@ -451,9 +565,38 @@ impl Builder {
 
     fn finish(mut self) -> ParsedLaw {
         // Nothing should remain open in well-formed XML; if it is, mark degraded.
-        if self.cur_article.is_some() || self.cur_paragraph.is_some() || self.cur_item.is_some() {
+        if self.cur_article.is_some()
+            || self.cur_paragraph.is_some()
+            || self.cur_item.is_some()
+            || !self.cur_subitems.is_empty()
+        {
             self.law.degraded = true;
         }
         self.law
     }
+}
+
+/// Depth of a bare `<Subitem{n}>` element (Subitem1 → 1, Subitem10 → 10); `None` for
+/// non-bare names such as `Subitem1Sentence` / `Subitem1Title`.
+fn subitem_level(name: &str) -> Option<usize> {
+    let rest = name.strip_prefix("Subitem")?;
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    rest.parse().ok()
+}
+
+fn is_subitem_sentence(name: &str) -> bool {
+    has_subitem_suffix(name, "Sentence")
+}
+
+fn is_subitem_title(name: &str) -> bool {
+    has_subitem_suffix(name, "Title")
+}
+
+/// True for `Subitem{digits}{suffix}` (e.g. `Subitem2Sentence` with suffix "Sentence").
+fn has_subitem_suffix(name: &str, suffix: &str) -> bool {
+    name.strip_prefix("Subitem")
+        .and_then(|r| r.strip_suffix(suffix))
+        .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
 }
