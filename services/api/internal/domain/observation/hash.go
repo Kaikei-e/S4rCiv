@@ -31,10 +31,15 @@ type EventFacts struct {
 	LogPrevHash       Digest     // previous event's log_hash (genesis = zero)
 }
 
-// hashable projects the facts onto the pinned, scalar-only canonical message.
+// Hashable projects the facts onto the pinned, scalar-only canonical message.
 // Absent values use the documented empty encoding ("" / zero), never an unset
 // field, so Deterministic marshaling is stable across proto implementations.
-func (f EventFacts) hashable() *observationv1.HashableEvent {
+//
+// The verification read surface (ADR-000014) reuses this exact projection to
+// rebuild a stored event for client-side re-hashing, so the bytes a third party
+// re-marshals are identical to the bytes the collector hashed — the canonical
+// form lives in one place, never re-derived in SQL.
+func (f EventFacts) Hashable() *observationv1.HashableEvent {
 	return &observationv1.HashableEvent{
 		EventId:           f.EventID,
 		StreamId:          f.StreamID,
@@ -54,7 +59,7 @@ func (f EventFacts) hashable() *observationv1.HashableEvent {
 // Re-running it with identical facts yields identical bytes; this is what a
 // third-party verifier reimplements to check the chain (CORE_CONCEPT §13).
 func (f EventFacts) LogHash() (Digest, error) {
-	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(f.hashable())
+	b, err := proto.MarshalOptions{Deterministic: true}.Marshal(f.Hashable())
 	if err != nil {
 		return Digest{}, err
 	}

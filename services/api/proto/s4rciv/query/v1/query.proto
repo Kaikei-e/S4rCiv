@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package s4rciv.query.v1;
 
+import "s4rciv/observation/v1/observation.proto";
+
 option go_package = "s4rciv.org/api/gen/s4rciv/query/v1;queryv1";
 
 // Read-only query surface over the interpretation-plane read models (M1).
@@ -42,6 +44,18 @@ service QueryService {
   // actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
   // This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
   rpc ListLegislatorVotes(ListLegislatorVotesRequest) returns (ListLegislatorVotesResponse);
+
+  // ── 完全性検証 read surface (ADR-000014) ────────────────────────────────────
+  // Per-Stream (事案) export for in-browser BOUNDED integrity verification: every
+  // event's canonical HashableEvent (the exact field set hashed; ADR-000003) plus
+  // its stored log_hash, so the READER'S OWN machine recomputes
+  // log_hash = sha256(Deterministic-marshal(HashableEvent)) and checks the
+  // content/log chain. This is deliberately NOT a server-asserted "verified" flag:
+  // §5's adversary distrusts S4rCiv, so a green ✓ from S4rCiv is "grading your own
+  // exam". The server returns ground-truth fields; the browser judges. Bounded to
+  // one Stream; full genesis→head recomputation is delegated to third-party mirrors
+  // via export (the global log chain is impractical to replay per page load).
+  rpc GetStreamVerification(GetStreamVerificationRequest) returns (GetStreamVerificationResponse);
 }
 
 // Provenance + source attribution attached to every projected record.
@@ -51,12 +65,18 @@ message Attribution {
   string fetched_at = 3; // RFC3339 UTC, the observed_at of the backing event
   int64 observation_seq = 4; // backing observation.event.seq (provenance)
   bool was_ocr = 5; // low-confidence extraction flag (snapshot.was_ocr)
-  // Global log-chain linkage of the backing event (hex sha256). Shown by the
-  // Provenance chip as "連鎖 #seq ← prev" with a "(未検証)" label: it proves the
-  // chain exists, but is NOT a verification result (real verification is a later
-  // milestone; ADR-000007 / E1). Empty when the reader does not join the event.
+  // Global log-chain linkage of the backing event (hex sha256): it proves the
+  // backing event sits in the chain, but is NOT a verification result. Integrity
+  // verification is per-chain/checkpoint, not per-record, and runs in the per-case
+  // verification panel (ADR-000014; canonical form ADR-000003). Empty when the
+  // reader does not join the event.
   string log_hash = 6;
   string prev_log_hash = 7;
+  // Observation-plane Stream this record belongs to (the monitoring unit;
+  // kokkai:<issueID> / egov-law:<lawID>). The key for GetStreamVerification, so the
+  // UI deep-links a record to its 事案 verification panel without reconstructing the
+  // stream_id prefix client-side. Empty when the reader does not resolve it.
+  string stream_id = 8;
 }
 
 message Meeting {
@@ -403,4 +423,50 @@ message ListLegislatorVotesResponse {
   string identity_confidence = 3;
   repeated LegislatorVote votes = 4;
   string next_page_token = 5;
+}
+
+// ── 完全性検証 read surface (ADR-000014) ──────────────────────────────────────
+
+// One event laid out for the reader's own machine to re-hash. `hashable` is the
+// exact, canonical, scalar-only field set over which log_hash was computed
+// (ADR-000003 proto-linked-v1). The verifier recomputes
+// sha256(Deterministic-marshal(hashable)) and asserts it equals `log_hash`; a
+// mismatch means the served facts or hash were altered. It then chains events by
+// asserting each event's recomputed log_hash equals the next event's
+// hashable.log_prev_hash (content chain: prev_content_hash continuity).
+message VerifiableEvent {
+  int64 seq = 1; // global observation.event.seq (stable citation handle + ordering)
+  s4rciv.observation.v1.HashableEvent hashable = 2; // the exact bytes hashed
+  string log_hash = 3; // stored log_hash (lowercase hex); recompute MUST equal this
+}
+
+// A commitment to the log chain through `through_seq` (ADR-000014 §4). It bounds
+// in-browser verification to the nearest checkpoint instead of replaying genesis.
+// In v0 the signing/anchoring job does not run yet, so `signed`=false and
+// signature/anchors are empty: the panel states plainly that this is S4rCiv's own
+// commitment, not yet independently anchored (external anchor未了). What defeats a
+// FULL re-sign by S4rCiv itself is the external anchor — that is the deferred part.
+message VerificationCheckpoint {
+  int64 through_seq = 1;
+  int64 tree_size = 2;
+  string root_hash = 3; // lowercase hex
+  string alg_version = 4; // pinned hashing scheme (proto-linked-v1)
+  bool signed = 5; // false in v0 (no signing job yet)
+  string signer_key_id = 6; // "" until signed
+  string recorded_at = 7; // RFC3339 UTC
+}
+
+message GetStreamVerificationRequest {
+  string stream_id = 1; // observation-plane Stream id (kokkai:<issueID> / egov-law:<lawID>)
+}
+message GetStreamVerificationResponse {
+  string stream_id = 1;
+  string source = 2;
+  string alg_version = 3; // the pinned hashing scheme the reader must implement (proto-linked-v1)
+  repeated VerifiableEvent events = 4; // this stream's events, ordered by stream_seq asc
+  // The checkpoint covering this stream's highest seq, when one exists. has_checkpoint
+  // is false in v0 (no checkpoint is written yet) — verification is then bounded to
+  // this stream's internal consistency, which the panel states plainly.
+  bool has_checkpoint = 5;
+  VerificationCheckpoint checkpoint = 6;
 }

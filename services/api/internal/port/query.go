@@ -5,6 +5,7 @@ import (
 	"time"
 
 	leg "s4rciv.org/api/internal/domain/legislative"
+	obs "s4rciv.org/api/internal/domain/observation"
 )
 
 // Attribution travels with every read-model view: source, the NDL reference
@@ -17,10 +18,15 @@ type Attribution struct {
 	WasOCR         bool
 	// Global log-chain linkage of the backing event (hex sha256). Populated by the
 	// timeline reader (which joins observation.event); empty for readers that do not.
-	// Shown as chain linkage with a "(未検証)" label — not a verification result
-	// (ADR-000007 / E1).
+	// This is chain linkage, not a verification result; integrity verification is
+	// per-chain/checkpoint, not per-record (ADR-000014; canonical form ADR-000003).
 	LogHash     string
 	PrevLogHash string
+	// Observation-plane Stream this record belongs to (the monitoring unit). The
+	// key for GetStreamVerification — populated where the reader knows its stream
+	// (meeting / law), so the UI deep-links a record to its 事案 verification panel
+	// without reconstructing the stream_id prefix client-side. Empty elsewhere.
+	StreamID string
 }
 
 // TimelineFilter is the cross-source timeline query (ADR-000006). Filters are
@@ -170,6 +176,43 @@ type SangiinVoteMapView struct {
 	Attr         Attribution
 }
 
+// ── 完全性検証 read surface views (ADR-000014) ───────────────────────────────
+
+// VerifiableEventView is one event laid out for the reader's own machine to
+// re-hash. Facts is the domain projection inputs; the handler turns it into the
+// canonical HashableEvent via EventFacts.Hashable() (the same projection the
+// collector hashed), so the bytes a third party re-marshals match exactly.
+// LogHash is the STORED hash (lowercase hex); the verifier asserts its own
+// recompute equals it.
+type VerifiableEventView struct {
+	Seq     int64
+	Facts   obs.EventFacts
+	LogHash string
+}
+
+// CheckpointView is a commitment to the log chain through ThroughSeq (ADR-000014
+// §4). In v0 no signing job runs, so Signed is false and SignerKeyID is empty.
+type CheckpointView struct {
+	ThroughSeq  int64
+	TreeSize    int64
+	RootHash    string // lowercase hex
+	AlgVersion  string
+	Signed      bool
+	SignerKeyID string
+	RecordedAt  time.Time
+}
+
+// StreamVerificationView is one Stream's full export for bounded in-browser
+// verification (ADR-000014): every event's canonical facts + stored log_hash,
+// ordered by stream_seq asc, plus the covering checkpoint when one exists.
+type StreamVerificationView struct {
+	StreamID   string
+	Source     string
+	AlgVersion string
+	Events     []VerifiableEventView
+	Checkpoint *CheckpointView // nil when no checkpoint covers this stream yet (v0)
+}
+
 // QueryReader is the read-only view over the interpretation read models.
 type QueryReader interface {
 	Meeting(ctx context.Context, issueID string) (MeetingView, []SpeechView, bool, error)
@@ -190,4 +233,7 @@ type QueryReader interface {
 	// 内訳 + 比例 panel + coverage for one vote.
 	ListSangiinVoteEvents(ctx context.Context, session, limit, offset int) (int, []SangiinVoteEventSummaryView, error)
 	GetSangiinVoteMap(ctx context.Context, voteEventID string) (SangiinVoteMapView, bool, error)
+	// StreamVerification returns one Stream's full verifiable export for the
+	// in-browser verifier (ADR-000014). found=false when the stream has no events.
+	StreamVerification(ctx context.Context, streamID string) (StreamVerificationView, bool, error)
 }

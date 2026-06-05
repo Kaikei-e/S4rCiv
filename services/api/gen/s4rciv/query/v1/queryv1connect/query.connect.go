@@ -63,6 +63,9 @@ const (
 	// QueryServiceListLegislatorVotesProcedure is the fully-qualified name of the QueryService's
 	// ListLegislatorVotes RPC.
 	QueryServiceListLegislatorVotesProcedure = "/s4rciv.query.v1.QueryService/ListLegislatorVotes"
+	// QueryServiceGetStreamVerificationProcedure is the fully-qualified name of the QueryService's
+	// GetStreamVerification RPC.
+	QueryServiceGetStreamVerificationProcedure = "/s4rciv.query.v1.QueryService/GetStreamVerification"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -79,6 +82,7 @@ var (
 	queryServiceListSangiinVoteEventsMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("ListSangiinVoteEvents")
 	queryServiceGetSangiinVoteMapMethodDescriptor     = queryServiceServiceDescriptor.Methods().ByName("GetSangiinVoteMap")
 	queryServiceListLegislatorVotesMethodDescriptor   = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
+	queryServiceGetStreamVerificationMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("GetStreamVerification")
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -114,6 +118,17 @@ type QueryServiceClient interface {
 	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
 	// This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
 	ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error)
+	// ── 完全性検証 read surface (ADR-000014) ────────────────────────────────────
+	// Per-Stream (事案) export for in-browser BOUNDED integrity verification: every
+	// event's canonical HashableEvent (the exact field set hashed; ADR-000003) plus
+	// its stored log_hash, so the READER'S OWN machine recomputes
+	// log_hash = sha256(Deterministic-marshal(HashableEvent)) and checks the
+	// content/log chain. This is deliberately NOT a server-asserted "verified" flag:
+	// §5's adversary distrusts S4rCiv, so a green ✓ from S4rCiv is "grading your own
+	// exam". The server returns ground-truth fields; the browser judges. Bounded to
+	// one Stream; full genesis→head recomputation is delegated to third-party mirrors
+	// via export (the global log chain is impractical to replay per page load).
+	GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error)
 }
 
 // NewQueryServiceClient constructs a client for the s4rciv.query.v1.QueryService service. By
@@ -192,6 +207,12 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceListLegislatorVotesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getStreamVerification: connect.NewClient[v1.GetStreamVerificationRequest, v1.GetStreamVerificationResponse](
+			httpClient,
+			baseURL+QueryServiceGetStreamVerificationProcedure,
+			connect.WithSchema(queryServiceGetStreamVerificationMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -208,6 +229,7 @@ type queryServiceClient struct {
 	listSangiinVoteEvents *connect.Client[v1.ListSangiinVoteEventsRequest, v1.ListSangiinVoteEventsResponse]
 	getSangiinVoteMap     *connect.Client[v1.GetSangiinVoteMapRequest, v1.GetSangiinVoteMapResponse]
 	listLegislatorVotes   *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
+	getStreamVerification *connect.Client[v1.GetStreamVerificationRequest, v1.GetStreamVerificationResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -265,6 +287,11 @@ func (c *queryServiceClient) ListLegislatorVotes(ctx context.Context, req *conne
 	return c.listLegislatorVotes.CallUnary(ctx, req)
 }
 
+// GetStreamVerification calls s4rciv.query.v1.QueryService.GetStreamVerification.
+func (c *queryServiceClient) GetStreamVerification(ctx context.Context, req *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error) {
+	return c.getStreamVerification.CallUnary(ctx, req)
+}
+
 // QueryServiceHandler is an implementation of the s4rciv.query.v1.QueryService service.
 type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
@@ -298,6 +325,17 @@ type QueryServiceHandler interface {
 	// actor, compiled ONLY for a high-confidence identity (homonyms are not merged).
 	// This is the ONLY per-person axis; speeches are never compiled (ADR-000004).
 	ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error)
+	// ── 完全性検証 read surface (ADR-000014) ────────────────────────────────────
+	// Per-Stream (事案) export for in-browser BOUNDED integrity verification: every
+	// event's canonical HashableEvent (the exact field set hashed; ADR-000003) plus
+	// its stored log_hash, so the READER'S OWN machine recomputes
+	// log_hash = sha256(Deterministic-marshal(HashableEvent)) and checks the
+	// content/log chain. This is deliberately NOT a server-asserted "verified" flag:
+	// §5's adversary distrusts S4rCiv, so a green ✓ from S4rCiv is "grading your own
+	// exam". The server returns ground-truth fields; the browser judges. Bounded to
+	// one Stream; full genesis→head recomputation is delegated to third-party mirrors
+	// via export (the global log chain is impractical to replay per page load).
+	GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error)
 }
 
 // NewQueryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -372,6 +410,12 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceListLegislatorVotesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceGetStreamVerificationHandler := connect.NewUnaryHandler(
+		QueryServiceGetStreamVerificationProcedure,
+		svc.GetStreamVerification,
+		connect.WithSchema(queryServiceGetStreamVerificationMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/s4rciv.query.v1.QueryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case QueryServiceGetMeetingProcedure:
@@ -396,6 +440,8 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceGetSangiinVoteMapHandler.ServeHTTP(w, r)
 		case QueryServiceListLegislatorVotesProcedure:
 			queryServiceListLegislatorVotesHandler.ServeHTTP(w, r)
+		case QueryServiceGetStreamVerificationProcedure:
+			queryServiceGetStreamVerificationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -447,4 +493,8 @@ func (UnimplementedQueryServiceHandler) GetSangiinVoteMap(context.Context, *conn
 
 func (UnimplementedQueryServiceHandler) ListLegislatorVotes(context.Context, *connect.Request[v1.ListLegislatorVotesRequest]) (*connect.Response[v1.ListLegislatorVotesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListLegislatorVotes is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetStreamVerification is not implemented"))
 }

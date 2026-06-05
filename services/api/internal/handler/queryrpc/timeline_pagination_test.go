@@ -83,6 +83,9 @@ func (fakeTimelineReader) ListSangiinVoteEvents(context.Context, int, int, int) 
 func (fakeTimelineReader) GetSangiinVoteMap(context.Context, string) (port.SangiinVoteMapView, bool, error) {
 	return port.SangiinVoteMapView{}, false, nil
 }
+func (fakeTimelineReader) StreamVerification(context.Context, string) (port.StreamVerificationView, bool, error) {
+	return port.StreamVerificationView{}, false, nil
+}
 
 func TestListTimelineKeysetPagination(t *testing.T) {
 	// Full set: seq 10 (newest) … 1 (oldest), page size 3.

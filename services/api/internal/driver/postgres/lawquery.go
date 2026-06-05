@@ -48,7 +48,7 @@ func scanLaw(row pgx.Row) (port.LawView, error) {
 	lv.Law.RepealDate = deref(repeal)
 	lv.Attr = port.Attribution{
 		Source: "egov-law", Permalink: lv.Law.Permalink, FetchedAt: observedAt,
-		ObservationSeq: seq, WasOCR: wasOCR,
+		ObservationSeq: seq, WasOCR: wasOCR, StreamID: lv.Law.StreamID,
 	}
 	return lv, nil
 }

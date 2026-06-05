@@ -45,7 +45,7 @@ func (q *QueryReader) Meeting(ctx context.Context, issueID string) (port.Meeting
 	src := sourceOf(mv.Meeting.StreamID)
 	mv.Attr = port.Attribution{
 		Source: src, Permalink: mv.Meeting.Permalink, FetchedAt: observedAt,
-		ObservationSeq: seq, WasOCR: mv.Meeting.WasOCR,
+		ObservationSeq: seq, WasOCR: mv.Meeting.WasOCR, StreamID: mv.Meeting.StreamID,
 	}
 
 	speeches, err := q.speeches(ctx, issueID, src)

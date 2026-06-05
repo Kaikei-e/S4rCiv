@@ -509,6 +509,50 @@ func toVoteEvent(v port.VoteEventView) *queryv1.VoteEvent {
 	return out
 }
 
+// GetStreamVerification serves the per-Stream verifiable export (ADR-000014).
+// It maps each event's domain facts to the canonical HashableEvent via
+// EventFacts.Hashable() — the same projection the collector hashed — so the
+// bytes the reader's browser re-marshals are identical. The server asserts no
+// "verified" flag; it returns ground-truth fields and lets the reader judge.
+func (h *Handler) GetStreamVerification(ctx context.Context, req *connect.Request[queryv1.GetStreamVerificationRequest]) (*connect.Response[queryv1.GetStreamVerificationResponse], error) {
+	streamID := req.Msg.GetStreamId()
+	if streamID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("stream_id is required"))
+	}
+	view, found, err := h.reader.StreamVerification(ctx, streamID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if !found {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("stream %s not found", streamID))
+	}
+	out := &queryv1.GetStreamVerificationResponse{
+		StreamId:   view.StreamID,
+		Source:     view.Source,
+		AlgVersion: view.AlgVersion,
+	}
+	for _, e := range view.Events {
+		out.Events = append(out.Events, &queryv1.VerifiableEvent{
+			Seq:      e.Seq,
+			Hashable: e.Facts.Hashable(),
+			LogHash:  e.LogHash,
+		})
+	}
+	if cp := view.Checkpoint; cp != nil {
+		out.HasCheckpoint = true
+		out.Checkpoint = &queryv1.VerificationCheckpoint{
+			ThroughSeq:  cp.ThroughSeq,
+			TreeSize:    cp.TreeSize,
+			RootHash:    cp.RootHash,
+			AlgVersion:  cp.AlgVersion,
+			Signed:      cp.Signed,
+			SignerKeyId: cp.SignerKeyID,
+			RecordedAt:  cp.RecordedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
 func toAttribution(a port.Attribution) *queryv1.Attribution {
 	return &queryv1.Attribution{
 		Source:         a.Source,
@@ -518,6 +562,7 @@ func toAttribution(a port.Attribution) *queryv1.Attribution {
 		WasOcr:         a.WasOCR,
 		LogHash:        a.LogHash,
 		PrevLogHash:    a.PrevLogHash,
+		StreamId:       a.StreamID,
 	}
 }
 
