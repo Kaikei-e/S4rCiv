@@ -2,7 +2,7 @@
 
 **_sentinel for civic records_** — a passive, read-only flight recorder for public records, plus a situation-room dashboard for citizens.
 
-![status](https://img.shields.io/badge/status-concept%20(v0)-orange)
+![status](https://img.shields.io/badge/status-in%20development%20(M1%E2%80%93M2)-yellow)
 ![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg)](https://github.com/RichardLitt/standard-readme)
 
@@ -26,6 +26,7 @@ In lineage, S4rCiv follows the "radical transparency" and "beneficial informatio
 - [Verifiability](#verifiability)
 - [Sources](#sources)
 - [Status and roadmap](#status-and-roadmap)
+- [Running locally](#running-locally)
 - [Related work](#related-work)
 - [Contributing](#contributing)
 - [License](#license)
@@ -84,35 +85,28 @@ S4rCiv's trustworthiness rests as much on what it **does not** do as on what it 
 
 ## Architecture
 
-A single self-hosted binary, adapter-based, with an embedded event store. Adding a new source equals adding a new adapter (collect + normalize). See concept document [§8](concepts/CORE_CONCEPT_0001.md) for detail.
+A small set of self-hostable services (Go for collection and query, Rust for the structural diff, SvelteKit for the web, Postgres) combined adapter-style. Adding a new source equals adding a new adapter (collect + normalize). See concept document [§8](concepts/CORE_CONCEPT_0001.md) for detail.
 
-```
-Public APIs / pages (+ Internet Archive)
-        │  HTTP GET only (passive, read-only)
-        ▼
-┌──────────────┐   ┌──────────────┐   ┌─────────────────────────┐
-│ Source        │──▶│ Normalizer    │──▶│ Event Log (CQRS)        │
-│ Adapters      │   │ AKN/Popolo/  │   │ append-only · hash-chain │  ← observation plane
-│ (Rust / Go)   │   │ OCDS + diff   │   │ (tamper-evident          │
-│               │   │ / classify    │   │  ground truth)           │
-└──────────────┘   └──────────────┘   └────────────┬────────────┘
-                                                     │ projection (recomputable)
-                                                     ▼
-                                        ┌─────────────────────────┐
-                                        │ Read Models              │  ← interpretation plane
-                                        │ timeline / entity /      │
-                                        │ vote / contract / funding │
-                                        │ + LLM summaries          │
-                                        └────────────┬────────────┘
-                                                     ▼
-                                        ┌─────────────────────────┐
-                                        │ Web (SvelteKit +         │
-                                        │ MapLibre/WebGPU)          │
-                                        │ situation-room dashboard  │
-                                        └─────────────────────────┘
+```mermaid
+flowchart TB
+  SRC["Public APIs / pages (+ Internet Archive)"]
+  subgraph OBS["Observation plane (immutable · append-only · hash-chain)"]
+    COL["Source adapters / collection<br/>collector (Go)<br/>kokkai · e-Gov laws · Sangiin votes · member rosters"]
+    LOG[("Event log, CQRS<br/>append-only · hash-chain<br/>ground truth")]
+  end
+  subgraph INT["Interpretation plane (recomputable + provenance / confidence)"]
+    DIF["Structural diff — differ<br/>Rust · Connect-RPC · stateless"]
+    RM[("Read models<br/>timeline · roll-call votes · laws · district vote map")]
+  end
+  API["api (Go · Connect-RPC · read-only)"]
+  WEB["Web — SvelteKit situation-room dashboard"]
+  SRC -->|HTTP GET only| COL --> LOG
+  LOG -. projection .-> DIF --> RM
+  LOG -. projection .-> RM
+  RM --> API --> WEB
 ```
 
-The **observation plane** is the immutable ground truth — raw snapshots plus hash-chained change events. The **interpretation plane** consists of normalized entities, change classification, and LLM summaries; it is a projection that can be recomputed from the observation plane at any time, where every field carries provenance and confidence. Interpretation is never written back into the observation plane.
+The structural diff is handled by a standalone **differ** service (Rust · Connect-RPC · stateless, ADR-000005); collection (`collector`) and query (`api`) are separate Go binaries. The **observation plane** is the immutable ground truth — raw snapshots plus hash-chained change events. The **interpretation plane** consists of normalized entities, change classification, and summaries; it is a projection that can be recomputed from the observation plane at any time, where every field carries provenance and confidence. Interpretation is never written back into the observation plane.
 
 The UI conventions are specified in [`design/DESIGN_LANGUAGE.md`](design/DESIGN_LANGUAGE.md) (dark by default, targeting WCAG 2.2 AA, color used only to convey state).
 
@@ -120,7 +114,7 @@ The UI conventions are specified in [`design/DESIGN_LANGUAGE.md`](design/DESIGN_
 
 The observation-plane log is append-only. Each event carries the hash of the previous snapshot (`prev_content_hash`) and the log's own hash chain (`log_prev_hash`). This makes the log **tamper-evident** — not tamper-proof, but such that any tampering can be detected. A third party can independently verify that S4rCiv has not rewritten its own records after the fact.
 
-For a project that calls itself a "record of the record," this verifiability is not a feature but a precondition. Where possible, content is also fetched via the Internet Archive (Memento), reinforcing the trail through a third-party archive.
+Integrity verification is not a per-record "verified" badge; it runs **bounded**, in the browser, on a case page — recomputing only the segment from the most recent signed checkpoint (ADR-000014). For a project that calls itself a "record of the record," this verifiability is not a feature but a precondition. Where possible, content is also fetched via the Internet Archive (Memento), reinforcing the trail through a third-party archive.
 
 ## Sources
 
@@ -128,8 +122,10 @@ Each source is implemented as an adapter, run with per-source rate limiting on b
 
 | Source | Content | Endpoint | Status |
 |---|---|---|---|
-| National Diet Library Minutes Search API (国会会議録検索API) | Plenary / committee proceedings, speeches, recorded votes | `https://kokkai.ndl.go.jp/api/` | MVP (M1) |
-| e-Gov Laws API v2 (Digital Agency) | Statute XML (constitution, laws, cabinet/ministerial orders, etc.), updated-laws list | `https://laws.e-gov.go.jp/api/2/` | MVP (M2) |
+| National Diet Library Minutes Search API (国会会議録検索API) | Plenary / committee proceedings, speeches, recorded votes | `https://kokkai.ndl.go.jp/api/` | Implemented (M1) |
+| e-Gov Laws API v2 (Digital Agency) | Statute XML (constitution, laws, cabinet/ministerial orders, etc.), updated-laws list | `https://laws.e-gov.go.jp/api/2/` | Implemented (M2) |
+| House of Councillors roll-call votes (参議院 記名投票) | Per-member yea/nay on Sangiin plenary votes (the axis of the district map) | `https://www.sangiin.go.jp/` | Implemented (M4) |
+| Official member rosters of both Houses (両院 公式議員名簿) | Sitting members' parliamentary group and district (Popolo identity, supports the vote map) | `https://www.shugiin.go.jp/` · `https://www.sangiin.go.jp/` | Implemented (M4) |
 | Official Gazette / public-notice base registry (官報・告示) | Machine-readable structured data for public notices | Targeted within FY2026 | Future |
 | Political funds reports (Ministry of Internal Affairs, 政治資金収支報告書) | Political-fund income and expenditure | Web publication mandated 2027-01 | Future |
 | Public procurement (調達ポータル) | Tenders, awards, contracts (normalized to OCDS) | `https://www.p-portal.go.jp/` | Future |
@@ -138,17 +134,31 @@ Each source is implemented as an adapter, run with per-source rate limiting on b
 
 ## Status and roadmap
 
-**Concept stage (v0). There is no code yet.** The repository currently contains only `LICENSE`, the concept documents, [`../DISCIPLINE.md`](../DISCIPLINE.md), the design language, and a web scaffold. Build, lint, and test commands will be added to this README when scaffolding begins.
+**In development. M1 (Diet minutes) and M2 (e-Gov laws) collect, diff, project, and serve over the read-only query API.** M3 / M4 are partially implemented; M5 / M6 are not started. Public release (M6) has not been reached, and operational deployment instructions do not yet exist. For now the project runs as a local Docker Compose stack (see [Running locally](#running-locally)). The reasoning behind the design is recorded in [`ADR/`](ADR) (000001–000015).
 
-Milestones (concept document §11):
+Milestones (concept document §11; status: ✓ done / ◐ partial / ○ not started):
 
-- **M0 — Skeleton**: single binary, append-only + hash-chained event log, adapter interface, observation/interpretation plane separation.
-- **M1 — Legislative adapter**: fetch proceedings and speeches from the Diet minutes API; project members / parliamentary groups with Popolo; build `VoteEvent` from recorded votes.
-- **M2 — Laws adapter**: poll the e-Gov "updated laws" list; compute AKN structural diffs.
-- **M3 — Dashboard v0**: timeline plus opt-in watch & alerts.
-- **M4 — Map**: electoral-district / municipality layers on MapLibre.
-- **M5 — Summaries v0**: a thin summarization layer, with source links required.
-- **M6 — Public release**: finalize licensing, self-hosting instructions, and publish the criteria for selecting monitored targets.
+- **✓ M0 — Skeleton**: three-schema model (observation / interpretation / control), append-only + hash-chained event log, adapter interface, observation/interpretation plane separation.
+- **✓ M1 — Legislative adapter**: fetch proceedings and speeches from the Diet minutes API; project members / parliamentary groups with Popolo; build `VoteEvent` from recorded votes.
+- **✓ M2 — Laws adapter**: poll the e-Gov "updated laws" list; compute AKN structural diffs via a standalone differ service (down to articles, paragraphs, items, sub-items, and defined terms).
+- **◐ M3 — Dashboard v0**: the cross-source timeline (bidirectional keyset pagination) and per-member roll-call votes are implemented. Watch & alerts are design-only (ADR-000007: no server push; feed plus device-local storage).
+- **◐ M4 — Map**: a district choropleth of House of Councillors roll-call votes (per-prefecture breakdown + proportional panel + coverage) is implemented. The House of Representatives is blocked because per-member votes are not published, so the map pivots to the Sangiin (ADR-000010).
+- **○ M5 — Summaries v0**: a thin summarization layer, with source links required. Not started.
+- **○ M6 — Public release**: finalize licensing, self-hosting instructions, and publish the criteria for selecting monitored targets. Not started.
+
+## Running locally
+
+For now the project runs as a local Docker Compose stack (project name `s4rciv`). Prerequisites are Docker, plus Go if you want to run the tests.
+
+```sh
+cp .env.example .env            # set POSTGRES_* / USER_AGENT
+# write the DB password into secrets/db_password.txt
+docker compose up -d            # brings up db · migrate(Atlas) · api · collector · differ · web
+# web: http://127.0.0.1:3000   api (Connect-RPC, read-only): 127.0.0.1:8080
+cd services/api && go test ./...
+```
+
+The stack starts empty (the watch list only grows via `discover`). For seeding data (`collector discover` and other subcommands), proto regeneration, migrations, and container operations, see [`../CLAUDE.md`](../CLAUDE.md) and the `docker-compose` skill.
 
 ## Related work
 
@@ -177,6 +187,7 @@ Primary sources and links:
 
 - National Diet Library Minutes Search API spec — <https://kokkai.ndl.go.jp/api.html>
 - e-Gov Laws API v2 — <https://laws.e-gov.go.jp/api/2/swagger-ui> / updated-laws list — <https://laws.e-gov.go.jp/update/>
+- House of Councillors (roll-call votes / member roster) — <https://www.sangiin.go.jp/>
 - Political funds reports (MIC) — <https://www.soumu.go.jp/senkyo/seiji_s/seijishikin/>
 - Procurement portal — <https://www.p-portal.go.jp/>
 - EDGI Web Monitoring — <https://envirodatagov.org/website-monitoring/>
