@@ -20,11 +20,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Commands (run from `services/api`)
 
-- `go test ./...` — unit tests (DB-touching drivers are build-verified only; domain/usecase/gateway are fully unit-tested with fakes/fixtures, no live API).
+- `go test ./...` — unit tests (domain/usecase/gateway/handler, fakes/fixtures, no live API). The `postgres` drivers now have a real-DB integration suite (next section), not just build-verification.
 - `go vet ./...` — vet.
 - `buf generate` (+ `buf lint`) — regenerate `gen/` after editing `proto/` (needs `protoc-gen-go` + `protoc-gen-connect-go` on PATH).
 - `atlas migrate hash --env local` (from repo root) — rehash after adding a migration.
 - `collector run|poll-once|reproject|discover --from YYYY-MM-DD --until YYYY-MM-DD` — collector subcommands.
+
+### Test suite (run from repo root; ADR-000016)
+
+The host toolchain (Go 1.26, protoc, Atlas) is **not** relied on — every DB-touching layer runs in containers against the real Postgres from `compose.yaml`, so `git clone && make test` reproduces the whole suite with only Docker (+ Node for browser E2E). `make help` lists targets.
+
+- `make unit` — Go + Rust + web (Vitest) unit tests, hermetic.
+- `make cdc` — contract checks: `scripts/check-proto-drift.sh` (api vs differ `diff.proto` byte-equality) + `buf breaking` vs the base ref. No Pact (shared buf-generated `.proto` makes it redundant).
+- `make integration` — Go `postgres` drivers vs a real migrated Postgres, `//go:build integration`, **template-DB-per-test** (`CREATE DATABASE … TEMPLATE`), `-race`. Asserts the append-only / log-chain / trigger / CHECK invariants a fake can't.
+- `make e2e` — Playwright browser journeys vs the real stack, deterministically seeded by `internal/e2eseed` (reuses `EventFacts.LogHash`; fictional names only). Needs `pnpm exec playwright install chromium` once.
+- `make test` — all of the above, then teardown; `make down` to tear down manually.
+- web: `pnpm test` (Vitest: `verification` CDC project + `component` project). The in-browser verifier CDC (ADR-000014) lives in `web/src/lib/verification/`.
 
 ## What S4rCiv is
 
