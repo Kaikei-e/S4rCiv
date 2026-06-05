@@ -1,4 +1,4 @@
-h1:IOT84u9tHqaUeXHs4xySC5Gpwg5I7UxndF9qPprcg5E=
+h1:3NDcwE/AyRXMnI1m5lRAVLDfj9sdPLpAWjyp8VP+/5g=
 20260602000000_init.sql h1:yqgIHQzAlQ2poB6u5BBahFLlZZLLQ3rIjUG3xnNJ7PU=
 20260603000001_observation_plane.sql h1:DnlLhY2F1nwyCMkZUFYHkaKX3vwbfJ3izJvSqN3QRQs=
 20260603000002_interpretation_plane.sql h1:vGAb1vXzwCNkn1Hv9vqJw3fJj9Ah5RaMM0Dtaqu7lzY=
@@ -15,3 +15,4 @@ h1:IOT84u9tHqaUeXHs4xySC5Gpwg5I7UxndF9qPprcg5E=
 20260603000013_legislator_district_name_key.sql h1:1bOZej6KEo6avrZcAjL3oqcdQszIw2jwyIcrd8YYwLo=
 20260603000014_sangiin_vote_read_model.sql h1:vKsiMvXtCK2wRf9NS/ynhke8U6dUVn1RKrHGSjoxbas=
 20260603000015_sangiin_source_seed.sql h1:a3x9bVYruncmK9MSFzBWmvOpPTYPmH8Qw2CJRRGZpUE=
+20260603000016_law_node_subitem.sql h1:qynUPg6JTT39WuAtIt9butfi/ZFXX9gMuUBZCgtPvik=
