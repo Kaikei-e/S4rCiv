@@ -34,6 +34,20 @@ _Avoid_: provider, origin
 生きた文書（法令）の、ある時点で効力を持つ溶け込み済み本文。S4rCiv は法令 Stream の観測内容としてこの現行本文を取り、各改正は同 Stream の `ResourceChanged` 列として現れる（事後確定の固定記録である会議録と対比）。
 _Avoid_: 沿革, 全版スナップショット
 
+### 収集の運用（control 面）
+
+**Watch（監視エントリ）**:
+ある Stream を定期取得対象として control 面に登録した1件。全 Watch の集合＝**監視リスト**＝現在ポーリングしている Resource 集合。
+_Avoid_: subscription, job
+
+**Discover（発見）**:
+Source の一覧／更新エンドポイントを走査し、新たな Resource を Watch として監視リストへ加える操作。**監視リストは Discover でのみ増える**（Poll は既存 Watch を取得するだけで監視対象を増やさない）。観測の網羅性は Discover の到達範囲が決める。
+_Avoid_: crawl, scrape, index
+
+**Poll（ポーリング）**:
+既存 Watch を1件取得し、観測内容のハッシュから観測イベント型を判定・記録する操作。新しい Resource を発見する力は持たない。
+_Avoid_: fetch（HTTP取得の意味に限定）, scan
+
 ### 観測面の記録物
 
 **Observation Event（観測イベント）**:
