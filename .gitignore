@@ -15,6 +15,12 @@
 /web/build/
 /web/.vite/
 
+# Test artifacts
+/web/test-results/
+/web/playwright-report/
+/web/coverage/
+/web/.last-run.json
+
 # OS / editor
 .DS_Store
 *.log

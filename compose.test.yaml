@@ -1,0 +1,100 @@
+# Test overlay — merged on top of compose.yaml:
+#   docker compose -f compose.yaml -f compose.test.yaml ...
+#
+# Why an explicitly-named overlay (not compose.override.yaml): the test wiring must
+# NEVER auto-apply to a normal `docker compose up`. It only materializes when this
+# file is passed with -f. The production compose.yaml is left untouched (no divergence).
+#
+# The Makefile is the single entrypoint a third party runs. Layers:
+#   - test-runner : Go unit + integration against a REAL migrated Postgres. The
+#                   integration suite (//go:build integration) creates an isolated
+#                   s4rciv_tmpl template DB and clones one database per test
+#                   (CREATE DATABASE ... TEMPLATE), so the append-only log's global
+#                   seq / hash-chain semantics are tested faithfully and in parallel.
+#   - seed        : deterministic, fixed-input seeder for the E2E stack (reuses the
+#                   production hash code so content_hash/log_hash are reproducible).
+#   - web/api/db  : inherited from compose.yaml, brought up for browser E2E.
+#
+# db is NOT host-published (compose.yaml), so seeding runs INSIDE the network here.
+
+services:
+  # Park the command-side daemons during tests: their independent project loop
+  # (ADR-000015) would re-fold observation events into read models and race the
+  # deterministic E2E seed. `profiles` keeps them out of every test `up`/`run`
+  # unless explicitly requested.
+  collector:
+    profiles: ["daemons"]
+  collector-egov:
+    profiles: ["daemons"]
+
+  # Go unit + integration test runner. `run --rm` starts only this + its depends_on,
+  # returns the `go test` exit code directly, and the container is removed after.
+  test-runner:
+    build:
+      context: ./services/api
+      target: test
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      # The integration suite reads migration SQL from here to build the template DB.
+      MIGRATIONS_DIR: /migrations
+      USER_AGENT: ${USER_AGENT:-s4rciv-test}
+    secrets:
+      - db_password
+    volumes:
+      - ./db/migrations:/migrations:ro
+    # Default: unit only. The Makefile overrides with -tags=integration for the
+    # real-DB suite. go test needs a writable cache/tmp.
+    command: ["go", "test", "./..."]
+    restart: "no"
+
+  # Deterministic seeder for the E2E stack. Runs the production-identical hashing
+  # code path (EventFacts.LogHash) over FIXED inputs so the seeded observation log
+  # and read models are byte-reproducible and assertable from the browser.
+  seed:
+    build:
+      context: ./services/api
+      target: test
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      USER_AGENT: ${USER_AGENT:-s4rciv-test}
+    secrets:
+      - db_password
+    # Reuses the deterministic seeding helpers behind the e2eseed build tag; writes
+    # the fixed fixture set into the E2E s4rciv database (NOT a template clone).
+    command: ["go", "test", "-tags=e2eseed", "-run", "^TestSeedE2E$", "-count=1", "./internal/e2eseed/..."]
+    restart: "no"
+
+  # Rust differ unit + in-process diff/eId contract tests (no DB, no network).
+  differ-test:
+    build:
+      context: ./services/differ
+      target: test
+    command: ["cargo", "test", "--all"]
+    restart: "no"
+
+  # SvelteKit component/unit tests + the in-browser verifier CDC tests (Vitest).
+  web-test:
+    build:
+      context: ./web
+      target: test
+    # The verifier CDC consumes the Go producer's golden vector (single source of
+    # truth) via a monorepo-relative import. The web build context can't see it, so
+    # mount it read-only at the path Vite resolves (4 levels up from the fixture).
+    volumes:
+      - ./services/api/internal/domain/observation/testdata/hashable_golden.json:/services/api/internal/domain/observation/testdata/hashable_golden.json:ro
+    command: ["pnpm", "test"]
+    restart: "no"

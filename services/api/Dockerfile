@@ -8,6 +8,14 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/collector ./cmd/collector
 
+# Test stage: full Go toolchain + source for unit + integration tests. Reuses the
+# build stage (source already COPYed, modules cached). CGO on so `go test -race`
+# works (gcc ships in the golang image). The compose test-runner overrides CMD and
+# mounts db/migrations at /migrations for the template-DB-per-test integration suite.
+FROM build AS test
+ENV CGO_ENABLED=1 MIGRATIONS_DIR=/migrations
+CMD ["go", "test", "./..."]
+
 # Query side (read-only Connect-RPC server).
 FROM gcr.io/distroless/static-debian12:nonroot AS api
 WORKDIR /app
