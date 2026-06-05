@@ -40,6 +40,10 @@ _Avoid_: 沿革, 全版スナップショット
 ある Resource を1回観測した不変記録。型は `ResourceObserved` / `ResourceChanged` / `ResourceVanished` / `ResourceRestored`。観測面では単に Event。
 _Avoid_: log entry, record, change
 
+**消失（vanished）/ 本文未取得（content-unavailable）**:
+`ResourceVanished` は Resource が**ソースの権威的な存在シグナルから消えた**ことだけを指す（e-Gov 法令なら法令一覧メタデータから当該 LawId が消える）。これと、ある時点の観測内容（現行本文スナップショット）が一時的に取得できない**本文未取得**とを峻別する。Resource がメタデータ上は存在し続けるのに本文ファイルだけ取れない場合（改正直後に新リビジョン本文の公開が遅れる等）は消失ではなく、観測イベントを生まない（間もなく再取得）。**存在（メタデータ）と観測内容（スナップショット）は別シグナル**であり、消失は前者の消滅のみを根拠とする。
+_Avoid_: 本文未取得を消失・404 と同一視すること
+
 **Snapshot（スナップショット）**:
 ある時点で Resource から取得した生バイト列。content hash で content-addressed され、Event が参照する ground-truth ペイロード。
 _Avoid_: capture, dump, blob（blob は格納機構の呼称）
