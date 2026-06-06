@@ -7,7 +7,31 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
-		adapter: adapter()
+		adapter: adapter(),
+		// Content-Security-Policy as defense-in-depth (CWE-1021/CWE-693). Everything is
+		// same-origin: the map style is inline and its GeoJSON basemap is served from
+		// /geo, so no remote script/style/tile/connect origins are needed. 'auto' mode
+		// lets SvelteKit nonce/hash its own inline bootstrap under script-src 'self'.
+		// maplibre-gl needs blob: workers and injects inline element styles, hence
+		// worker/child blob: and style-src 'unsafe-inline'. frame-ancestors 'none'
+		// blocks clickjacking.
+		csp: {
+			mode: 'auto',
+			directives: {
+				'default-src': ['self'],
+				'script-src': ['self'],
+				'style-src': ['self', 'unsafe-inline'],
+				'img-src': ['self', 'data:', 'blob:'],
+				'font-src': ['self'],
+				'connect-src': ['self'],
+				'worker-src': ['self', 'blob:'],
+				'child-src': ['self', 'blob:'],
+				'frame-ancestors': ['none'],
+				'base-uri': ['self'],
+				'form-action': ['self'],
+				'object-src': ['none']
+			}
+		}
 	}
 };
 
