@@ -48,7 +48,7 @@ match &some_option {
 - Group related modules in directories with `mod.rs` or named module files
 - Re-export key types at module boundaries with `pub use`
 
-> **S4rCiv:** Keep `lib.rs` focused on module boundaries and `main.rs` focused on startup, shutdown, and dependency wiring in each adapter / normalizer binary.
+> **S4RCIV:** Keep `lib.rs` focused on module boundaries and `main.rs` focused on startup, shutdown, and dependency wiring in each adapter / normalizer binary.
 
 ```rust
 // ✅ lib.rs — module declarations
@@ -146,7 +146,7 @@ let cve_ids: Vec<String> = sqlx::query_as(
 let data = some_fallible_call()?; // caller has no idea what failed
 ```
 
-> **S4rCiv:** Prefer one crate-level domain error enum per service, then translate it into transport-specific errors only at HTTP or RPC boundaries.
+> **S4RCIV:** Prefer one crate-level domain error enum per service, then translate it into transport-specific errors only at HTTP or RPC boundaries.
 
 ## 4. Async & Concurrency
 
@@ -233,7 +233,7 @@ axum::serve(listener, app)
     .await?;
 ```
 
-> **S4rCiv:** Use `CancellationToken` to coordinate shutdown between the HTTP server and background tasks when a Rust service owns both.
+> **S4RCIV:** Use `CancellationToken` to coordinate shutdown between the HTTP server and background tasks when a Rust service owns both.
 
 ## 5. Enum Dispatch
 
@@ -287,7 +287,7 @@ let adapter: Box<dyn Adapter> = match target_type {
 };
 ```
 
-> **S4rCiv:** Use enum dispatch when the implementation set is small and known at compile time. Switch to trait objects only when extensibility is a real requirement.
+> **S4RCIV:** Use enum dispatch when the implementation set is small and known at compile time. Switch to trait objects only when extensibility is a real requirement.
 
 ## 6. Database (sqlx)
 
@@ -389,7 +389,7 @@ for vuln in &vulnerabilities {
 tx.commit().await.map_err(ScannerError::Database)?;
 ```
 
-> **S4rCiv:** If a Rust service stores immutable events, keep those tables append-only and isolate mutable current-state projections behind explicit upsert paths.
+> **S4RCIV:** If a Rust service stores immutable events, keep those tables append-only and isolate mutable current-state projections behind explicit upsert paths.
 
 ## 7. Serialization (serde)
 
@@ -522,7 +522,7 @@ let job = queries::get_scan_job(&self.pool, job_id)
     })?;
 ```
 
-> **S4rCiv:** When a Rust component exposes an HTTP or RPC API, keep serialization boundaries explicit and map transport codes from domain errors in one place.
+> **S4RCIV:** When a Rust component exposes an HTTP or RPC API, keep serialization boundaries explicit and map transport codes from domain errors in one place.
 
 ## 9. Logging & Tracing
 
@@ -565,7 +565,7 @@ info!("scan {} completed for job {}", scan_id, job_id);
 | `debug!` | Detailed flow — individual queries, HTTP requests, intermediate state |
 | `trace!` | Very verbose — raw payloads, iteration details |
 
-> **S4rCiv:** Default to `info` logging and override with a component-specific `RUST_LOG` target such as `RUST_LOG=<crate_name>=debug` when debugging.
+> **S4RCIV:** Default to `info` logging and override with a component-specific `RUST_LOG` target such as `RUST_LOG=<crate_name>=debug` when debugging.
 
 ## 10. Testing
 
@@ -657,7 +657,7 @@ impl EpssClient {
 }
 ```
 
-> **S4rCiv:** Run tests from the concrete crate directory, for example `cd <adapter> && cargo test`.
+> **S4RCIV:** Run tests from the concrete crate directory, for example `cd <adapter> && cargo test`.
 
 ## 11. Configuration
 
@@ -700,7 +700,7 @@ impl ServiceConfig {
 fn start_server(db_url: &str, redis_url: &str, listen_addr: &str) { ... }
 ```
 
-> **S4rCiv:** Pick one primary configuration approach per service and document it clearly. Avoid mixing multiple partially overlapping config sources without a strong reason.
+> **S4RCIV:** Pick one primary configuration approach per service and document it clearly. Avoid mixing multiple partially overlapping config sources without a strong reason.
 
 ## 12. Security
 
@@ -759,7 +759,7 @@ cargo clippy -- -D warnings
 cargo fmt --check
 ```
 
-> **S4rCiv:** Verification should be component-local, for example `cd <adapter> && cargo clippy -- -D warnings`.
+> **S4RCIV:** Verification should be component-local, for example `cd <adapter> && cargo clippy -- -D warnings`.
 
 ## 14. Performance
 
@@ -834,7 +834,7 @@ HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
 CMD ["my-service"]
 ```
 
-> **S4rCiv:** Runtime images should install only the tools the service genuinely needs in production. Keep the runtime surface area smaller than the build image whenever possible.
+> **S4RCIV:** Runtime images should install only the tools the service genuinely needs in production. Keep the runtime surface area smaller than the build image whenever possible.
 
 ## 16. Modern Rust Patterns
 

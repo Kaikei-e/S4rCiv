@@ -29,12 +29,14 @@ import (
 	"s4rciv.org/api/internal/driver/egovhttp"
 	"s4rciv.org/api/internal/driver/kokkaihttp"
 	"s4rciv.org/api/internal/driver/postgres"
+	"s4rciv.org/api/internal/driver/signer"
 	"s4rciv.org/api/internal/driver/sys"
 	"s4rciv.org/api/internal/gateway/egov"
 	"s4rciv.org/api/internal/gateway/giinroster"
 	"s4rciv.org/api/internal/gateway/kokkai"
 	"s4rciv.org/api/internal/gateway/sangiin"
 	"s4rciv.org/api/internal/port"
+	"s4rciv.org/api/internal/usecase/checkpoint"
 	"s4rciv.org/api/internal/usecase/collect"
 	"s4rciv.org/api/internal/usecase/diff"
 	"s4rciv.org/api/internal/usecase/project"
@@ -118,6 +120,13 @@ func main() {
 		log.Fatalf("startup: %v", err)
 	}
 	defer pool.Close()
+
+	// checkpoint attests the global log-chain head, so it is source-agnostic and does
+	// not need a per-source pipeline.
+	if rest[0] == "checkpoint" {
+		runCheckpoint(ctx, pool, rest[1:])
+		return
+	}
 
 	p, err := wire(ctx, pool, *source)
 	if err != nil {
@@ -660,14 +669,52 @@ func nudge(ch chan struct{}) {
 	}
 }
 
+// runCheckpoint signs the current observation log-chain head into a checkpoint
+// (ADR-000019). It is idempotent — a no-op when the head is already covered — so it
+// is safe to run periodically (cron/timer). `checkpoint genkey [name]` instead prints
+// a fresh keypair and never touches the DB.
+func runCheckpoint(ctx context.Context, pool *pgxpool.Pool, args []string) {
+	if len(args) > 0 && args[0] == "genkey" {
+		name := "s4rciv-checkpoint"
+		if len(args) > 1 && args[1] != "" {
+			name = args[1]
+		}
+		skey, vkey, err := signer.Generate(name)
+		if err != nil {
+			log.Fatalf("checkpoint genkey: %v", err)
+		}
+		fmt.Printf("# private signing key — store as the %s secret, never commit\n%s\n", signer.KeyFileEnv, skey)
+		fmt.Printf("# public verifier key — publish so third parties can verify\n%s\n", vkey)
+		return
+	}
+
+	s, err := signer.Load()
+	if err != nil {
+		log.Fatalf("checkpoint: load signing key: %v", err)
+	}
+	uc := checkpoint.New(postgres.NewCheckpointStore(pool), s, sys.IDGen{})
+	created, seq, err := uc.Run(ctx)
+	if err != nil {
+		log.Fatalf("checkpoint: %v", err)
+	}
+	if created {
+		log.Printf("checkpoint: signed through seq %d", seq)
+	} else {
+		log.Printf("checkpoint: nothing to do (head seq %d already covered)", seq)
+	}
+}
+
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law|giin-roster|sangiin-vote|sangiin-roster] <run|poll-once|reproject|discover>
+	fmt.Fprint(os.Stderr, `usage: collector [--source kokkai|egov-law|giin-roster|sangiin-vote|sangiin-roster] <run|poll-once|reproject|discover|checkpoint>
 
   run         daemon: poll due watches + project on a loop
   poll-once   one poll+project cycle, then exit
   reproject   truncate read models and replay from seq 0
   discover --from YYYY-MM-DD --until YYYY-MM-DD [--max N]
               egov-law also: [--law-type T] [--updated]
+  checkpoint  sign the current log-chain head (idempotent; run periodically)
+  checkpoint genkey [name]
+              print a fresh Ed25519 keypair (skey secret + vkey to publish)
 `)
 }
 

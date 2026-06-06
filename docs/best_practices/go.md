@@ -7,7 +7,7 @@
 - Name packages as nouns, not verbs — `scheduler` not `scheduling`
 - Keep `main.go` thin: parse config → connect deps → wire handlers → start server → await signal
 
-> **S4rCiv:** Keep `main.go` thin in each source-adapter / normalizer binary. Wire dependencies there; keep collection and normalization logic in internal packages.
+> **S4RCIV:** Keep `main.go` thin in each source-adapter / normalizer binary. Wire dependencies there; keep collection and normalization logic in internal packages.
 
 ```go
 // ✅ main.go skeleton
@@ -88,7 +88,7 @@ func ErrNotFound(code, message string) *AppError   { ... }
 func ErrInternal(message string, err error) *AppError { ... }
 ```
 
-> **S4rCiv:** Keep transport-specific error mapping at the boundary. HTTP collectors and internal use cases should not all share the same wire format.
+> **S4RCIV:** Keep transport-specific error mapping at the boundary. HTTP collectors and internal use cases should not all share the same wire format.
 
 ## 3. Concurrency
 
@@ -130,7 +130,7 @@ if err := srv.Shutdown(shutdownCtx); err != nil {
 wg.Wait()
 ```
 
-> **S4rCiv:** Services with background workers, schedulers, or stream consumers must ensure every long-lived goroutine exits on `ctx.Done()`.
+> **S4RCIV:** Services with background workers, schedulers, or stream consumers must ensure every long-lived goroutine exits on `ctx.Done()`.
 
 ## 4. Testing
 
@@ -234,7 +234,7 @@ slog.Error("XREADGROUP failed", "error", err)
 slog.Info(fmt.Sprintf("scan %s completed for %s", scanID, target.Name))
 ```
 
-> **S4rCiv:** Emit structured JSON logs to stdout and let Docker Compose or the deployed runtime handle collection and aggregation.
+> **S4RCIV:** Emit structured JSON logs to stdout and let Docker Compose or the deployed runtime handle collection and aggregation.
 
 ## 6. HTTP Server
 
@@ -371,7 +371,7 @@ func encodeCursor(score float32, id uuid.UUID) string {
 // LIMIT $3
 ```
 
-> **S4rCiv:** If a service models immutable facts or events, keep append-only tables append-only and update only the derived projection tables designed for current state.
+> **S4RCIV:** If a service models immutable facts or events, keep append-only tables append-only and update only the derived projection tables designed for current state.
 
 ## 8. Redis
 
@@ -423,7 +423,7 @@ func (c *Consumer) Run(ctx context.Context) {
 }
 ```
 
-> **S4rCiv:** Provision shared infrastructure such as the event store or message channels through setup scripts or infrastructure code, not ad hoc application startup side effects.
+> **S4RCIV:** Provision shared infrastructure such as the event store or message channels through setup scripts or infrastructure code, not ad hoc application startup side effects.
 
 ## 9. Configuration
 
@@ -500,7 +500,7 @@ rows, err := pool.Query(ctx, fmt.Sprintf("SELECT * FROM projects WHERE id = '%s'
 - Run `gofmt` / `goimports` automatically (editor or pre-commit hook)
 - Use `golangci-lint` for extended checks when available
 
-> **S4rCiv:** Verification should be component-local, for example `cd <adapter>/app && go vet ./...` or `cd <adapter>/app && go test ./...`.
+> **S4RCIV:** Verification should be component-local, for example `cd <adapter>/app && go vet ./...` or `cd <adapter>/app && go test ./...`.
 
 ## 12. Docker
 

@@ -9,7 +9,7 @@
 - `__init__.py` は薄く保つ。副作用のある import を入れない
 - エントリポイントは `app/main.py` の `main()` のみ。ビジネスロジック禁止
 
-> **S4rCiv:** Python コンポーネント（LLM 要約パイプライン等）は `src/` 配下に `app/` パッケージを持つ構成を推奨。
+> **S4RCIV:** Python コンポーネント（LLM 要約パイプライン等）は `src/` 配下に `app/` パッケージを持つ構成を推奨。
 
 ```
 service/
@@ -71,7 +71,7 @@ except Exception:
     return None
 ```
 
-> **S4rCiv:** FastAPI ハンドラは `HTTPException` への変換レイヤを `handler/` に集約し、`usecase/` 以下はドメイン例外を投げる。
+> **S4RCIV:** FastAPI ハンドラは `HTTPException` への変換レイヤを `handler/` に集約し、`usecase/` 以下はドメイン例外を投げる。
 
 ## 4. Clean Architecture
 
@@ -96,7 +96,7 @@ class Summarize:
         return _summarize(article)
 ```
 
-> **S4rCiv:** この 5 層を厳守。`usecase` 内で `httpx` / `asyncpg` を直接呼ぶレビュー指摘は常に差し戻し。
+> **S4RCIV:** この 5 層を厳守。`usecase` 内で `httpx` / `asyncpg` を直接呼ぶレビュー指摘は常に差し戻し。
 
 ## 5. Pydantic & Dataclass
 
@@ -191,7 +191,7 @@ def test_length(input_: str, expected: int) -> None:
     assert len(input_) == expected
 ```
 
-> **S4rCiv:** FastAPI のモジュールレベル `router = APIRouter()` はプロセス横断状態を持ち、テスト間で汚染される。
+> **S4RCIV:** FastAPI のモジュールレベル `router = APIRouter()` はプロセス横断状態を持ち、テスト間で汚染される。
 > 解決: 各テストで `importlib.reload(module)` してルーターを再構築する。
 
 ```python

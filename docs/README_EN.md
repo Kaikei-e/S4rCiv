@@ -1,4 +1,4 @@
-# S4rCiv
+# S4RCIV
 
 **_sentinel for civic records_** — a passive, read-only flight recorder for public records, plus a situation-room dashboard for citizens.
 
@@ -10,15 +10,15 @@
 
 > A non-partisan, read-only civic-tech platform that continuously observes Japan's **public primary-source data** — legislation, laws and ordinances, public money, procurement — and records its **changes (including deletions) into a tamper-evident, append-only log** for anyone to trace and verify.
 
-Democratic transparency is not served by showing only "how things stand right now." It works only when anyone can later trace **when something changed, what changed, how it changed — and what was quietly removed.** S4rCiv combines a "flight recorder" that keeps recording public primary sources with a "situation-room dashboard" that lets you survey many sources at once, putting this **traceability over time** back into citizens' hands.
+Democratic transparency is not served by showing only "how things stand right now." It works only when anyone can later trace **when something changed, what changed, how it changed — and what was quietly removed.** S4RCIV combines a "flight recorder" that keeps recording public primary sources with a "situation-room dashboard" that lets you survey many sources at once, putting this **traceability over time** back into citizens' hands.
 
-S4rCiv is not a tool for confronting power. It is information infrastructure for **recording the public outputs of accountable public actors in a form anyone can verify.** It adds no opinion and no judgement to the record; all it keeps are observed facts and citations that lead back to the source. What is monitored, and by what criteria, is published — and the same mechanical pipeline is applied to every actor alike.
+S4RCIV is not a tool for confronting power. It is information infrastructure for **recording the public outputs of accountable public actors in a form anyone can verify.** It adds no opinion and no judgement to the record; all it keeps are observed facts and citations that lead back to the source. What is monitored, and by what criteria, is published — and the same mechanical pipeline is applied to every actor alike.
 
-In lineage, S4rCiv follows the "radical transparency" and "beneficial information flows" of g0v / Audrey Tang (Plurality), and is a modern successor to the EDGI Web Monitoring project (diff-monitoring of government web pages) in the United States.
+In lineage, S4RCIV follows the "radical transparency" and "beneficial information flows" of g0v / Audrey Tang (Plurality), and is a modern successor to the EDGI Web Monitoring project (diff-monitoring of government web pages) in the United States.
 
 ## Table of Contents
 
-- [Why S4rCiv](#why-s4rciv)
+- [Why S4RCIV](#why-s4rciv)
 - [What it does](#what-it-does)
 - [Design principles](#design-principles)
 - [What it does not do](#what-it-does-not-do)
@@ -32,11 +32,11 @@ In lineage, S4rCiv follows the "radical transparency" and "beneficial informatio
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
-## Why S4rCiv
+## Why S4RCIV
 
 Existing monitoring-oriented civic tech tends to be siloed into single-purpose sites — freedom-of-information, voting records, budgets — and most of them show only a snapshot of the "current value." Yet the value of public records lies in their **history of change**: when a clause was rewritten, how a contract amount shifted over time, when a published document disappeared. Without a way to confirm these after the fact, transparency becomes hollow.
 
-S4rCiv treats **change itself**, not the current value, as its primary unit of record. Even the loss of observability — silence — is kept as information.
+S4RCIV treats **change itself**, not the current value, as its primary unit of record. Even the loss of observability — silence — is kept as information.
 
 There is also a timing case for acting now, as several institutional tailwinds converge:
 
@@ -47,7 +47,7 @@ There is also a timing case for acting now, as several institutional tailwinds c
 
 ## What it does
 
-The S4rCiv pipeline reduces cleanly to three stages:
+The S4RCIV pipeline reduces cleanly to three stages:
 
 1. **Continuous collection** — fetch primary sources using HTTP GET only, against public endpoints.
 2. **Recording change** — hash the fetched content and record the diff against the previous version into an append-only, immutable log (`ResourceObserved` / `ResourceChanged` / `ResourceVanished` / `ResourceRestored`).
@@ -75,7 +75,7 @@ These are constraints, not aspirations. Any feature or dependency that violates 
 
 ## What it does not do
 
-S4rCiv's trustworthiness rests as much on what it **does not** do as on what it does. The authoritative list of prohibitions lives in [`../DISCIPLINE.md`](../DISCIPLINE.md). In summary:
+S4RCIV's trustworthiness rests as much on what it **does not** do as on what it does. The authoritative list of prohibitions lives in [`../DISCIPLINE.md`](../DISCIPLINE.md). In summary:
 
 - **Never monitor, profile, or expose private individuals.** The subject of observation is always an accountable public actor (politicians, parties, political organizations, public officials). Private individuals — such as small political-fund donors — are never cross-linked across records.
 - **Never act partisanly.** No targeting of a particular party or ideology; the same criteria and the same pipeline apply to all. The criteria for selecting what to monitor are published.
@@ -112,7 +112,7 @@ The UI conventions are specified in [`design/DESIGN_LANGUAGE.md`](design/DESIGN_
 
 ## Verifiability
 
-The observation-plane log is append-only. Each event carries the hash of the previous snapshot (`prev_content_hash`) and the log's own hash chain (`log_prev_hash`). This makes the log **tamper-evident** — not tamper-proof, but such that any tampering can be detected. A third party can independently verify that S4rCiv has not rewritten its own records after the fact.
+The observation-plane log is append-only. Each event carries the hash of the previous snapshot (`prev_content_hash`) and the log's own hash chain (`log_prev_hash`). This makes the log **tamper-evident** — not tamper-proof, but such that any tampering can be detected. A third party can independently verify that S4RCIV has not rewritten its own records after the fact.
 
 Integrity verification is not a per-record "verified" badge; it runs **bounded**, in the browser, on a case page — recomputing only the segment from the most recent signed checkpoint (ADR-000014). For a project that calls itself a "record of the record," this verifiability is not a feature but a precondition. Where possible, content is also fetched via the Internet Archive (Memento), reinforcing the trail through a third-party archive.
 
@@ -162,11 +162,11 @@ The stack starts empty (the watch list only grows via `discover`). For seeding d
 
 ## Related work
 
-S4rCiv favors cooperation over competition. By conforming to standards (AKN / Popolo / OCDS), it preserves the ability to connect with these projects.
+S4RCIV favors cooperation over competition. By conforming to standards (AKN / Popolo / OCDS), it preserves the ability to connect with these projects.
 
-- **Digital Democracy 2030 / Kouchou-AI** (participation & deliberation side, non-partisan OSS) — complementary; S4rCiv's structured records and diffs can feed deliberation as input context.
+- **Digital Democracy 2030 / Kouchou-AI** (participation & deliberation side, non-partisan OSS) — complementary; S4RCIV's structured records and diffs can feed deliberation as input context.
 - **Code for Japan / Code for 選挙** (Popolo, legislative trackers) — cooperation through Popolo interoperability.
-- **Seiji Shikin Center / political-finance-database** (public-money side) — S4rCiv complements them with time-series diffs and cross-source correlation.
+- **Seiji Shikin Center / political-finance-database** (public-money side) — S4RCIV complements them with time-series diffs and cross-source correlation.
 - **mySociety** (TheyWorkForYou / WhatDoTheyKnow) / **EDGI Web Monitoring** — the overseas lineage and prior art.
 
 ## Contributing

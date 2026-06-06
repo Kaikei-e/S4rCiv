@@ -112,7 +112,7 @@ $effect(() => {
 </script>
 ```
 
-> **S4rCiv:** In the dashboard frontend, `.svelte.ts` singleton state modules are appropriate for shared client-side state. Use `$effect` in route components for lifecycle work such as subscriptions, observers, and streaming connections.
+> **S4RCIV:** In the dashboard frontend, `.svelte.ts` singleton state modules are appropriate for shared client-side state. Use `$effect` in route components for lifecycle work such as subscriptions, observers, and streaming connections.
 
 ## 2. Component Patterns
 
@@ -219,7 +219,7 @@ const { items, row, empty }: Props = $props();
 <button on:click={handler}>...</button>
 ```
 
-> **S4rCiv:** Prefer callback props for new rune-first components. Reserve legacy event dispatchers for incremental migration only.
+> **S4RCIV:** Prefer callback props for new rune-first components. Reserve legacy event dispatchers for incremental migration only.
 
 ## 3. State Management
 
@@ -312,7 +312,7 @@ const state = getContext<ReturnType<typeof createSomeState>>('my-state');
 - Do not put derived data in state — use `$derived` instead
 - Do not put server-loaded data in state when SvelteKit `load()` data suffices
 
-> **S4rCiv:** Use global singletons only for genuinely app-wide client state. If a route can render on the server, prefer context or route-local state over module singletons.
+> **S4RCIV:** Use global singletons only for genuinely app-wide client state. If a route can render on the server, prefer context or route-local state over module singletons.
 
 ## 4. SvelteKit Routing & Data Loading
 
@@ -404,7 +404,7 @@ export const GET: RequestHandler = async () => {
 };
 ```
 
-> **S4rCiv:** In the dashboard frontend, prefer `+layout.ts` when multiple child routes need the same upstream data, and pass SvelteKit's `fetch` through to shared API clients.
+> **S4RCIV:** In the dashboard frontend, prefer `+layout.ts` when multiple child routes need the same upstream data, and pass SvelteKit's `fetch` through to shared API clients.
 
 ## 5. SSR, CSR & Prerendering
 
@@ -424,7 +424,7 @@ export const prerender = true;
 export const csr = false;
 ```
 
-> **S4rCiv:** Do not disable SSR globally. Set `ssr = false` narrowly on routes that need browser-only rendering primitives such as WebGL, WebGPU, or direct DOM APIs.
+> **S4RCIV:** Do not disable SSR globally. Set `ssr = false` narrowly on routes that need browser-only rendering primitives such as WebGL, WebGPU, or direct DOM APIs.
 
 ## 6. TypeScript
 
@@ -496,7 +496,7 @@ export interface ApiError {
 }
 ```
 
-> **S4rCiv:** Keep `types/api.ts` aligned with backend JSON contracts. Preserve field names and optionality unless the backend contract itself changes.
+> **S4RCIV:** Keep `types/api.ts` aligned with backend JSON contracts. Preserve field names and optionality unless the backend contract itself changes.
 
 ## 7. API Client & Data Fetching
 
@@ -592,7 +592,7 @@ export function createSSEConnection(options: SSEOptions): SSEConnection {
 }
 ```
 
-> **S4rCiv:** Wrap streaming transports behind a small client module and let route or layout components own connection lifecycle through `$effect` cleanup.
+> **S4RCIV:** Wrap streaming transports behind a small client module and let route or layout components own connection lifecycle through `$effect` cleanup.
 
 ## 8. Three.js / WebGPU Integration
 
@@ -699,7 +699,7 @@ $effect(() => {
 </script>
 ```
 
-> **S4rCiv:** For WebGL or Three.js integrations, keep mount, resize, and dispose behavior inside `$effect` cleanup paths so GPU resources are released deterministically.
+> **S4RCIV:** For WebGL or Three.js integrations, keep mount, resize, and dispose behavior inside `$effect` cleanup paths so GPU resources are released deterministically.
 
 ## 9. Styling (Tailwind CSS v4)
 
@@ -755,7 +755,7 @@ $effect(() => {
 </style>
 ```
 
-> **S4rCiv:** Treat the HUD palette here as an example of a coherent tokenized theme, not as a product-wide mandate. Match the active design system of the app you are editing.
+> **S4RCIV:** Treat the HUD palette here as an example of a coherent tokenized theme, not as a product-wide mandate. Match the active design system of the app you are editing.
 
 ## 10. Testing
 
@@ -848,7 +848,7 @@ describe('getProjects', () => {
 });
 ```
 
-> **S4rCiv:** In the dashboard frontend, use `pnpm run test`, `pnpm run test:watch`, or run a focused Vitest command for a single file.
+> **S4RCIV:** In the dashboard frontend, use `pnpm run test`, `pnpm run test:watch`, or run a focused Vitest command for a single file.
 
 ## 11. Linting & Formatting (Biome)
 
@@ -918,7 +918,7 @@ pnpm run format
 pnpm run check
 ```
 
-> **S4rCiv:** The dashboard frontend (`web/`) uses **pnpm** + `svelte-check` (`pnpm run check`). A linter/formatter (Biome or ESLint+Prettier) and a test runner (Vitest) are added when adopted — substitute `pnpm` and the actual scripts for any `bun`/Biome commands shown below.
+> **S4RCIV:** The dashboard frontend (`web/`) uses **pnpm** + `svelte-check` (`pnpm run check`). A linter/formatter (Biome or ESLint+Prettier) and a test runner (Vitest) are added when adopted — substitute `pnpm` and the actual scripts for any `bun`/Biome commands shown below.
 
 ## 12. Performance
 
@@ -1049,7 +1049,7 @@ CMD ["node", "build"]
 - Always expose a `/healthz` endpoint — used by Docker HEALTHCHECK and orchestrators
 - Return `{ "status": "ok" }` with 200 — no database or external service checks in the health endpoint
 
-> **S4rCiv:** Keep health endpoints simple and framework-native. Route, port, and adapter details should match the service's current deployment configuration rather than a copied example.
+> **S4RCIV:** Keep health endpoints simple and framework-native. Route, port, and adapter details should match the service's current deployment configuration rather than a copied example.
 
 ---
 

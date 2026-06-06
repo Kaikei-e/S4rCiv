@@ -1,4 +1,4 @@
-# S4rCiv — Design Language
+# S4RCIV — Design Language
 
 > ビジュアルデザインの規定。`CONCEPT.md`（プロダクト設計）と対。
 > 既定はダークテーマ。目標は WCAG 2.2 AA。
