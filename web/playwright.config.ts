@@ -19,5 +19,14 @@ export default defineConfig({
 		trace: 'on-first-retry',
 		testIdAttribute: 'data-testid'
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+	projects: [
+		{ name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+		// Mobile regression guard (ADR-000017): a 360px touch viewport. The device
+		// preset supplies hasTouch/isMobile (→ `pointer: coarse`); we pin width to the
+		// 360px floor we commit to supporting.
+		{
+			name: 'mobile-chromium',
+			use: { ...devices['Pixel 5'], viewport: { width: 360, height: 780 } }
+		}
+	]
 });
