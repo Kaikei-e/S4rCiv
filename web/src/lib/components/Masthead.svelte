@@ -19,7 +19,7 @@
 	// Compose each ledger fragment as a single string so the visible text is one text
 	// node (robust to text matchers; avoids {#if} splitting the run).
 	const coverageLabel = $derived(
-		coverage !== undefined ? `監視 ${coverage.toLocaleString()} 資源` : ''
+		coverage !== undefined ? `監視対象 ${coverage.toLocaleString()} 件` : ''
 	);
 	const checkpointLabel = $derived(
 		checkpoint

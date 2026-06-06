@@ -42,7 +42,7 @@ describe('Masthead', () => {
 				checkpoint: { seq: 8821, observedAt: '2026-06-06T09:00:00Z', verifyHref: '/verify' }
 			}
 		});
-		expect(screen.getByText(/監視 1,204 資源/)).toBeInTheDocument();
+		expect(screen.getByText(/監視対象 1,204 件/)).toBeInTheDocument();
 		expect(screen.getByText(/seq#8,821/)).toBeInTheDocument();
 		expect(screen.getByRole('link', { name: '▸検証' })).toHaveAttribute('href', '/verify');
 	});
