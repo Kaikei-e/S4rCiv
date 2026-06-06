@@ -1,6 +1,6 @@
 # Third-Party Licenses
 
-The `services/api` Go module bundles the third-party components below. The S4rCiv
+The `services/api` Go module bundles the third-party components below. The S4RCIV
 server body is **AGPL-3.0**; every component here is under a permissive license
 **compatible with AGPL-3.0**, with attribution retained as required. (Researched and
 recorded per ADR-000008 / the M4 voter-name segmentation work, 2026-06-03.)
