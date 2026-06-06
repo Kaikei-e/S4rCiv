@@ -4,11 +4,22 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"s4rciv.org/api/internal/port"
 )
 
 const siteBase = "https://www.sangiin.go.jp"
+
+// isRootedPath reports whether p is a safe same-site relative path: it must start
+// with a single "/" and carry no scheme or userinfo, so siteBase+p can never be
+// re-anchored to another host (SSRF guard, CWE-918). Rejects "//host", "://" and "@".
+func isRootedPath(p string) bool {
+	return strings.HasPrefix(p, "/") &&
+		!strings.HasPrefix(p, "//") &&
+		!strings.Contains(p, "://") &&
+		!strings.Contains(p, "@")
+}
 
 var (
 	reRedirect      = regexp.MustCompile(`location\.replace\("([^"]+)"\)`)
@@ -32,6 +43,12 @@ func (g *Gateway) DiscoverRoster(ctx context.Context) (port.MeetingRef, error) {
 		return port.MeetingRef{}, fmt.Errorf("sangiin roster: redirect target not found")
 	}
 	path := string(m[1])
+	// The redirect target is page-derived, so guard it before it is concatenated to
+	// siteBase: only a rooted same-site relative path is accepted, so a poisoned
+	// source can never re-anchor CanonicalURL onto another host (SSRF, CWE-918).
+	if !isRootedPath(path) {
+		return port.MeetingRef{}, fmt.Errorf("sangiin roster: refusing non-rooted redirect target %q", path)
+	}
 	session := ""
 	if sm := reRosterSession.FindStringSubmatch(path); sm != nil {
 		session = sm[1]

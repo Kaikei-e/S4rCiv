@@ -168,7 +168,9 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 	case giinroster.SourceName:
 		// egovhttp is a generic rate-limited + robots-compliant GET client (GetAbs);
 		// reused here for the roster pages (ADR-000008). DB is Go-owned; differ N/A.
-		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
+		// The 両院 roster spans www.shugiin.go.jp (base) AND www.sangiin.go.jp, so the
+		// 参 host is added to the GetAbs allowlist (SSRF guard; F-005).
+		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit, "www.sangiin.go.jp")
 		if err != nil {
 			return nil, err
 		}
