@@ -37,7 +37,7 @@ The host toolchain (Go 1.26, protoc, Atlas) is **not** relied on — every DB-to
 - `make test` — all of the above, then teardown; `make down` to tear down manually.
 - web: `pnpm test` (Vitest: `verification` CDC project + `component` project). The in-browser verifier CDC (ADR-000014) lives in `web/src/lib/verification/`.
 
-## What S4rCiv is
+## What S4RCIV is
 
 A **passive, read-only "flight recorder" for public records** plus a situation-room dashboard for citizens. It continuously collects Japanese public primary-source data (legislation, laws/ordinances, public money, procurement) and records *changes* — including deletions — into an immutable, hash-chained log, so anyone can trace **when / what / how something changed or was removed**. Non-partisan civic-tech infrastructure in the g0v / Audrey Tang lineage; a modern successor to EDGI Web Monitoring.
 
@@ -47,7 +47,7 @@ These are constraints, not aspirations. Any feature or dependency that violates 
 
 1. **Passive / read-only** — public-endpoint HTTP GET only. No auth, no submissions, no writes, no automated actions. A *sentinel*, never an actor.
 2. **Public primary sources only.**
-3. **Append-only, hash-chained log** — keep everything (incl. deletions/reversions); the log is tamper-evident so S4rCiv can prove it has not rewritten history.
+3. **Append-only, hash-chained log** — keep everything (incl. deletions/reversions); the log is tamper-evident so S4RCIV can prove it has not rewritten history.
 4. **Dual-plane separation** — *observation plane* (raw snapshots + hash-chained events; immutable ground truth) vs *interpretation plane* (normalized entities + classification + LLM summaries; recomputable projections carrying provenance + confidence).
 5. **Standards-based, no silos** — Akoma Ntoso (laws/proceedings), Popolo (people/roles), OCDS (procurement).
 6. **AI summarizes only, never judges** — no scoring/opinions in the data layer; every summary links back to source text/diff with confidence + provenance.
@@ -90,14 +90,14 @@ Deliberately unresolved — confirm with the user before baking in: hosting mode
 
 ## Available skills (Claude Code)
 
-Project skills live in `.claude/skills/` and are auto-discovered (no registration). Transferred from the sibling Alt project and adapted to S4rCiv. Reference docs for the `bp-*` skills live in `docs/best_practices/`.
+Project skills live in `.claude/skills/` and are auto-discovered (no registration). Transferred from the sibling Alt project and adapted to S4RCIV. Reference docs for the `bp-*` skills live in `docs/best_practices/`.
 
 | Skill | Purpose | Fires on |
 |---|---|---|
 | `bp-rust` / `bp-go` / `bp-python` / `bp-svelte` / `bp-typescript` | Language best practices (DECREE) | editing `.rs` / `.go` / `.py` / `.svelte` / `.ts` files |
 | `clean-architecture` | Handler→Usecase→Port→Gateway→Driver layers, mapped to the adapter model + plane separation | layered backend work |
 | `immutable-design-guard` | Audits append-only event log, hash-chain integrity, reproject-safe projectors, disposable read models | migrations / projectors / event handlers; "イミュータブル", "event sourcing", "reproject" |
-| `security-auditor` | OWASP Top 10:2025 / ASVS 5.0 security review + S4rCiv collector compliance (SSRF / rate-limit / robots.txt / read-only) | "セキュリティレビュー", "脆弱性チェック", "OWASP" |
+| `security-auditor` | OWASP Top 10:2025 / ASVS 5.0 security review + S4RCIV collector compliance (SSRF / rate-limit / robots.txt / read-only) | "セキュリティレビュー", "脆弱性チェック", "OWASP" |
 | `web-researcher` | Official-docs-first web research → structured report | "調べて", "リサーチして", "公式ドキュメント確認して" |
 | `tdd-workflow` | Outside-in TDD (E2E → CDC → unit RED-GREEN-REFACTOR) + local CI parity | "TDDで", feature/bugfix work |
 | `s4rciv-adr-writer` | ADR authoring in Japanese (no deploy); template at `docs/ADR/template.md` | "ADR書いて", "ADRにまとめて", "ADRに記録して" |
