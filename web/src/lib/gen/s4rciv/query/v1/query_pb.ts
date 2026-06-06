@@ -2943,3 +2943,89 @@ export class GetStreamVerificationResponse extends Message<GetStreamVerification
   }
 }
 
+/**
+ * @generated from message s4rciv.query.v1.GetMastheadStatusRequest
+ */
+export class GetMastheadStatusRequest extends Message<GetMastheadStatusRequest> {
+  constructor(data?: PartialMessage<GetMastheadStatusRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetMastheadStatusRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetMastheadStatusRequest {
+    return new GetMastheadStatusRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetMastheadStatusRequest {
+    return new GetMastheadStatusRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetMastheadStatusRequest {
+    return new GetMastheadStatusRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetMastheadStatusRequest | PlainMessage<GetMastheadStatusRequest> | undefined, b: GetMastheadStatusRequest | PlainMessage<GetMastheadStatusRequest> | undefined): boolean {
+    return proto3.util.equals(GetMastheadStatusRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.GetMastheadStatusResponse
+ */
+export class GetMastheadStatusResponse extends Message<GetMastheadStatusResponse> {
+  /**
+   * Number of enabled Resources we watch (control.watch) — coverage/scope, never a
+   * claim of completeness.
+   *
+   * @generated from field: int64 watch_count = 1;
+   */
+  watchCount = protoInt64.zero;
+
+  /**
+   * The latest signed checkpoint, when one exists. has_checkpoint is false until the
+   * generator (ADR-000019) writes one; the masthead then shows only its stance line.
+   *
+   * @generated from field: bool has_checkpoint = 2;
+   */
+  hasCheckpoint = false;
+
+  /**
+   * @generated from field: s4rciv.query.v1.VerificationCheckpoint checkpoint = 3;
+   */
+  checkpoint?: VerificationCheckpoint;
+
+  constructor(data?: PartialMessage<GetMastheadStatusResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.GetMastheadStatusResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "watch_count", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "has_checkpoint", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 3, name: "checkpoint", kind: "message", T: VerificationCheckpoint },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetMastheadStatusResponse {
+    return new GetMastheadStatusResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetMastheadStatusResponse {
+    return new GetMastheadStatusResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetMastheadStatusResponse {
+    return new GetMastheadStatusResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetMastheadStatusResponse | PlainMessage<GetMastheadStatusResponse> | undefined, b: GetMastheadStatusResponse | PlainMessage<GetMastheadStatusResponse> | undefined): boolean {
+    return proto3.util.equals(GetMastheadStatusResponse, a, b);
+  }
+}
+

@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetStreamVerificationRequest, GetStreamVerificationResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
+import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMastheadStatusRequest, GetMastheadStatusResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetStreamVerificationRequest, GetStreamVerificationResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -160,6 +160,21 @@ export const QueryService = {
       name: "GetStreamVerification",
       I: GetStreamVerificationRequest,
       O: GetStreamVerificationResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ── Masthead status (ADR-000018 / ADR-000019) ───────────────────────────────
+     * Global provenance for the masthead: watch coverage (how many Resources we watch)
+     * and the latest signed checkpoint, if one exists. This is NOT a self-graded
+     * "verified ✓" — the checkpoint is a commitment a third party verifies, never a
+     * claim by S4rCiv about itself (ADR-000014 / 設計原則①).
+     *
+     * @generated from rpc s4rciv.query.v1.QueryService.GetMastheadStatus
+     */
+    getMastheadStatus: {
+      name: "GetMastheadStatus",
+      I: GetMastheadStatusRequest,
+      O: GetMastheadStatusResponse,
       kind: MethodKind.Unary,
     },
   }

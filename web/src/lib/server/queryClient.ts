@@ -22,7 +22,8 @@ import type {
 	GetVoteEventResponse,
 	ListVoteEventsResponse,
 	ListSangiinVoteEventsResponse,
-	GetSangiinVoteMapResponse
+	GetSangiinVoteMapResponse,
+	MastheadStatus
 } from '$lib/types';
 // Type-only: the verifier owns the GetStreamVerification JSON shape so the panel
 // and this client agree on one definition. import type is erased — no runtime
@@ -91,4 +92,10 @@ export async function getSangiinVoteMap(voteEventId: string): Promise<GetSangiin
 // fields present in the JSON so the verifier re-marshals the exact canonical form.
 export async function getStreamVerification(streamId: string): Promise<StreamVerificationJson> {
 	return json<StreamVerificationJson>(await client.getStreamVerification({ streamId }));
+}
+
+// Global provenance for the masthead (ADR-000018/000019): watch coverage + the latest
+// signed checkpoint, if one exists.
+export async function getMastheadStatus(): Promise<MastheadStatus> {
+	return json<MastheadStatus>(await client.getMastheadStatus({}));
 }

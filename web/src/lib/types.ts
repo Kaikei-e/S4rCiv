@@ -266,3 +266,20 @@ export interface GetSangiinVoteMapResponse {
 	matchedVotes?: number;
 	attribution?: Attribution;
 }
+
+// Global provenance for the masthead (ADR-000018/000019). A commitment, never a
+// self-graded "verified" flag.
+export interface MastheadCheckpoint {
+	throughSeq?: string;
+	treeSize?: string;
+	rootHash?: string;
+	algVersion?: string;
+	signed?: boolean;
+	signerKeyId?: string;
+	recordedAt?: string;
+}
+export interface MastheadStatus {
+	watchCount?: string;
+	hasCheckpoint?: boolean;
+	checkpoint?: MastheadCheckpoint;
+}

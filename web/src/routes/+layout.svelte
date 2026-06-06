@@ -2,8 +2,21 @@
 	import '$lib/styles/tokens.css';
 	import favicon from '$lib/assets/favicon.png';
 	import Masthead from '$lib/components/Masthead.svelte';
+	import type { Snippet } from 'svelte';
+	import type { LayoutData } from './$types';
 
-	let { children } = $props();
+	let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+	// Map the masthead provenance into the component's props. Coverage is always real
+	// (control.watch count); the checkpoint lights up only once the generator (ADR-000019)
+	// has written one. verifyHref is left unset until the public checkpoint feed exists.
+	const m = $derived(data?.masthead ?? null);
+	const coverage = $derived(m?.watchCount != null ? Number(m.watchCount) : undefined);
+	const checkpoint = $derived(
+		m?.hasCheckpoint && m.checkpoint
+			? { seq: Number(m.checkpoint.throughSeq ?? 0), observedAt: m.checkpoint.recordedAt }
+			: undefined
+	);
 </script>
 
 <svelte:head>
@@ -11,7 +24,7 @@
 </svelte:head>
 
 <a class="skip" href="#main">本文へスキップ</a>
-<Masthead />
+<Masthead {coverage} {checkpoint} />
 {@render children()}
 
 <style>
