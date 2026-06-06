@@ -79,7 +79,10 @@ seed: ## Deterministically seed the E2E database (fixed inputs → reproducible 
 	$(COMPOSE) run --rm seed
 
 e2e: up seed ## Playwright browser journeys vs the running, seeded stack
-	cd web && E2E_BASE_URL=http://127.0.0.1:$(WEB_HOST_PORT) pnpm exec playwright test; \
+	@# Scope the `cd web` to a subshell so the teardown `$(MAKE) down` runs from the
+	@# repo root (otherwise it executes in web/, which has no Makefile, and the test
+	@# stack is left running).
+	( cd web && E2E_BASE_URL=http://127.0.0.1:$(WEB_HOST_PORT) pnpm exec playwright test ); \
 	  s=$$?; $(MAKE) down; exit $$s
 
 ## ---- lifecycle ----------------------------------------------------------------
