@@ -12,6 +12,7 @@
 
 use axum::Router;
 use axum::body::Bytes;
+use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -55,12 +56,21 @@ impl ConnectError {
     }
 }
 
+/// Explicit request-body ceiling (CWE-400). The collector caps each fetched
+/// snapshot at 64 MiB and a prev+curr 法令標準XML pair is far smaller in practice,
+/// so this is a generous-but-bounded limit that makes the resource bound explicit
+/// and tunable instead of relying on axum's implicit 2 MiB default.
+const MAX_REQUEST_BYTES: usize = 64 * 1024 * 1024;
+
 /// Build the router. No shared state: the service is fully stateless.
 pub fn router() -> Router {
-    Router::new().route("/healthz", get(healthz)).route(
-        "/s4rciv.diff.v1.DiffService/ComputeChange",
-        post(compute_change),
-    )
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route(
+            "/s4rciv.diff.v1.DiffService/ComputeChange",
+            post(compute_change),
+        )
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
 }
 
 async fn healthz() -> StatusCode {
