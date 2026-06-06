@@ -226,7 +226,7 @@
 	}
 	button {
 		background: var(--accent);
-		color: #04222c;
+		color: var(--on-accent);
 		font-weight: 600;
 		border-color: transparent;
 		cursor: pointer;

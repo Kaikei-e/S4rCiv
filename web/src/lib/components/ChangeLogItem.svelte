@@ -146,9 +146,12 @@
 	.state {
 		font-size: 11px;
 	}
+	/* The row title IS the record title (法令名・会議録名), so it carries the serif display
+	   face — the editorial accent of the ledger (DESIGN_LANGUAGE §4.1). */
 	.title {
-		font-size: 15px;
-		font-weight: 600;
+		font-family: var(--font-display);
+		font-size: 16px;
+		font-weight: 700;
 		color: var(--text-1);
 		text-decoration: none;
 	}

@@ -153,6 +153,8 @@
 		color: var(--text-3);
 		font-size: 13px;
 	}
+	/* Diff lines sit in an inset well (--surface-inset, DESIGN_LANGUAGE §6): the status tint
+	   is mixed over the well, not over the card, so the diff reads as a recessed quotation. */
 	.line {
 		display: flex;
 		gap: 8px;
@@ -160,18 +162,19 @@
 		margin: 4px 0;
 		border-left: 3px solid var(--hairline-2);
 		border-radius: 0 var(--r-sm) var(--r-sm) 0;
+		background: var(--surface-inset);
 	}
 	.line.mod {
 		border-left-color: var(--st-changed);
-		background: color-mix(in srgb, var(--st-changed) 8%, transparent);
+		background: color-mix(in srgb, var(--st-changed) 8%, var(--surface-inset));
 	}
 	.line.add {
 		border-left-color: var(--st-nominal);
-		background: color-mix(in srgb, var(--st-nominal) 8%, transparent);
+		background: color-mix(in srgb, var(--st-nominal) 8%, var(--surface-inset));
 	}
 	.line.del {
 		border-left-color: var(--st-critical);
-		background: color-mix(in srgb, var(--st-critical) 8%, transparent);
+		background: color-mix(in srgb, var(--st-critical) 8%, var(--surface-inset));
 	}
 	.mark {
 		font-weight: 700;
@@ -195,6 +198,8 @@
 	}
 	.prev {
 		color: var(--st-critical-t);
+		text-decoration: line-through;
+		text-decoration-color: color-mix(in srgb, var(--st-critical) 60%, transparent);
 	}
 	.curr {
 		color: var(--st-nominal-t);

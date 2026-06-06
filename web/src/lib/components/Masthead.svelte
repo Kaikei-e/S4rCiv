@@ -80,7 +80,7 @@
 	.wordmark {
 		font-size: 18px;
 		font-weight: 700;
-		letter-spacing: 0.10em;
+		letter-spacing: 0.18em; /* editorial tracking (ledger, DESIGN_LANGUAGE §1) */
 		color: var(--text-1);
 		text-decoration: none;
 		white-space: nowrap;

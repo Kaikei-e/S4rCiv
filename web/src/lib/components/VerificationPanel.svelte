@@ -143,7 +143,7 @@
 		color: var(--text-2);
 	}
 	.status.ok {
-		color: var(--st-safe-t, var(--accent));
+		color: var(--st-nominal-t);
 	}
 	.status.warn {
 		color: var(--st-caution-t);
@@ -173,7 +173,7 @@
 		font-size: 12px;
 	}
 	.mark.ok {
-		color: var(--st-safe-t, var(--accent));
+		color: var(--st-nominal-t);
 	}
 	.mark.ng {
 		color: var(--st-critical-t);
