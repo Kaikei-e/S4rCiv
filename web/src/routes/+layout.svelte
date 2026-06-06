@@ -1,4 +1,28 @@
 <script lang="ts">
+	// Self-hosted fonts (DESIGN_LANGUAGE §11 / ADR-000020): no third-party request, so no
+	// visitor-IP leak (passive sentinel, principle #1). Weight- and subset-controlled to keep
+	// the CJK payload down; @fontsource ships font-display:swap so first paint never blocks.
+	// IBM Plex Mono — numbers / IDs / hashes / labels (latin subset, 400/500/600).
+	import '@fontsource/ibm-plex-mono/latin-400.css';
+	import '@fontsource/ibm-plex-mono/latin-500.css';
+	import '@fontsource/ibm-plex-mono/latin-600.css';
+	// IBM Plex Sans — latin runs inside sans body (latin subset, 400/500/600/700).
+	import '@fontsource/ibm-plex-sans/latin-400.css';
+	import '@fontsource/ibm-plex-sans/latin-500.css';
+	import '@fontsource/ibm-plex-sans/latin-600.css';
+	import '@fontsource/ibm-plex-sans/latin-700.css';
+	// IBM Plex Sans JP — Japanese body / UI (japanese subset, 400/500/600/700).
+	import '@fontsource/ibm-plex-sans-jp/japanese-400.css';
+	import '@fontsource/ibm-plex-sans-jp/japanese-500.css';
+	import '@fontsource/ibm-plex-sans-jp/japanese-600.css';
+	import '@fontsource/ibm-plex-sans-jp/japanese-700.css';
+	// Zen Old Mincho — editorial titles ONLY: Display / page H1 / record titles (600/700,
+	// japanese + latin subsets). System mincho is the fallback until this loads (--font-serif).
+	import '@fontsource/zen-old-mincho/japanese-600.css';
+	import '@fontsource/zen-old-mincho/japanese-700.css';
+	import '@fontsource/zen-old-mincho/latin-600.css';
+	import '@fontsource/zen-old-mincho/latin-700.css';
+
 	import '$lib/styles/tokens.css';
 	import favicon from '$lib/assets/favicon.png';
 	import Masthead from '$lib/components/Masthead.svelte';

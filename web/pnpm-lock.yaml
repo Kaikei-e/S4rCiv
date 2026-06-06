@@ -24,6 +24,18 @@ importers:
         specifier: ^5.24.0
         version: 5.24.0
     devDependencies:
+      '@fontsource/ibm-plex-mono':
+        specifier: ^5.2.7
+        version: 5.2.7
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/ibm-plex-sans-jp':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource/zen-old-mincho':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@playwright/test':
         specifier: ^1.60.0
         version: 1.60.0
@@ -349,6 +361,18 @@ packages:
   '@fastify/busboy@2.1.1':
     resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
     engines: {node: '>=14'}
+
+  '@fontsource/ibm-plex-mono@5.2.7':
+    resolution: {integrity: sha512-MKAb8qV+CaiMQn2B0dIi1OV3565NYzp3WN5b4oT6LTkk+F0jR6j0ZN+5BKJiIhffDC3rtBULsYZE65+0018z9w==}
+
+  '@fontsource/ibm-plex-sans-jp@5.2.8':
+    resolution: {integrity: sha512-ULgJLBVJEBIKBddVFla4PiOCHM4a7wjThS9FtMbmc9YehcYmnuMtF8/mi9ItZobHpQGwChzF/7ujoUTs+cYbZw==}
+
+  '@fontsource/ibm-plex-sans@5.2.8':
+    resolution: {integrity: sha512-eztSXjDhPhcpxNIiGTgMebdLP9qS4rWkysuE1V7c+DjOR0qiezaiDaTwQE7bTnG5HxAY/8M43XKDvs3cYq6ZYQ==}
+
+  '@fontsource/zen-old-mincho@5.2.8':
+    resolution: {integrity: sha512-ZMnFdz7/a97kdeR5KNfjiBJZc26BZhyI7+wgO87Z6lh+g6WtTJBvUokHyeQgjiCyXCXybpEuFLmc4zEZtzdNYA==}
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -1915,6 +1939,14 @@ snapshots:
   '@exodus/bytes@1.15.1': {}
 
   '@fastify/busboy@2.1.1': {}
+
+  '@fontsource/ibm-plex-mono@5.2.7': {}
+
+  '@fontsource/ibm-plex-sans-jp@5.2.8': {}
+
+  '@fontsource/ibm-plex-sans@5.2.8': {}
+
+  '@fontsource/zen-old-mincho@5.2.8': {}
 
   '@isaacs/cliui@8.0.2':
     dependencies:

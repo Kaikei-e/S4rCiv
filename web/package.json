@@ -16,6 +16,10 @@
 		"e2e:install": "playwright install --with-deps chromium"
 	},
 	"devDependencies": {
+		"@fontsource/ibm-plex-mono": "^5.2.7",
+		"@fontsource/ibm-plex-sans": "^5.2.8",
+		"@fontsource/ibm-plex-sans-jp": "^5.2.8",
+		"@fontsource/zen-old-mincho": "^5.2.8",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.57.0",
