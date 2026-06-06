@@ -109,8 +109,10 @@ services:
       DB_PASSWORD_FILE: /run/secrets/db_password
       USER_AGENT: ${USER_AGENT}
       DIFFER_URL: http://differ:9090
+      CHECKPOINT_SIGNING_KEY_FILE: /run/secrets/checkpoint_signing_key
     secrets:
       - db_password
+      - checkpoint_signing_key
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -204,3 +206,5 @@ volumes:
 secrets:
   db_password:
     file: ./secrets/db_password.txt
+  checkpoint_signing_key:
+    file: ./secrets/checkpoint_signing_key.txt
