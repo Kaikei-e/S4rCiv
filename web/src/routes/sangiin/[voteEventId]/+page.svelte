@@ -3,6 +3,7 @@
 	import type { SangiinPrVote } from '$lib/types';
 	import SangiinVoteMap from '$lib/components/SangiinVoteMap.svelte';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
+	import { VOTE_COLORS } from '$lib/voteColors';
 
 	let { data }: { data: PageData } = $props();
 	const m = $derived(data.map);
@@ -38,10 +39,10 @@
 		<section class="mapcol" aria-label="都道府県別の投票">
 			<SangiinVoteMap prefectures={m.prefectures ?? []} />
 			<ul class="legend" aria-label="凡例">
-				<li><span class="sw" style="background:#2e9e5b"></span>全員賛成</li>
-				<li><span class="sw" style="background:#d2454a"></span>全員反対</li>
-				<li><span class="sw" style="background:#e0a838"></span>割れ</li>
-				<li><span class="sw" style="background:#d7d9dd"></span>記録なし</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.yes}"></span>全員賛成</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.no}"></span>全員反対</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.split}"></span>割れ</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.none}"></span>記録なし</li>
 			</ul>
 			<!-- Narrow layout stacks 比例（全国区）below the map; keep it in view (§5). -->
 			{#if prCount > 0}
@@ -198,11 +199,13 @@
 	.opt {
 		font-size: 12px;
 	}
+	/* Factual category colours (neutral data-viz, not green=good/red=bad), keyed to the map
+	   (DESIGN_LANGUAGE §6). 棄権・欠席 stays a neutral grey. */
 	.opt-yes {
-		color: #2e9e5b;
+		color: var(--dv-1);
 	}
 	.opt-no {
-		color: #d2454a;
+		color: var(--dv-2);
 	}
 	.opt-abstain {
 		color: var(--text-3);

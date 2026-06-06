@@ -3,6 +3,7 @@
 	import type { Vote } from '$lib/types';
 	import DistrictVoteMap from '$lib/components/DistrictVoteMap.svelte';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
+	import { VOTE_COLORS } from '$lib/voteColors';
 
 	let { data }: { data: PageData } = $props();
 	const ev = $derived(data.voteEvent);
@@ -50,10 +51,10 @@
 		<section class="mapcol" aria-label="選挙区別の投票">
 			<DistrictVoteMap {votes} />
 			<ul class="legend" aria-label="凡例">
-				<li><span class="sw" style="background:#2e9e5b"></span>賛成</li>
-				<li><span class="sw" style="background:#d2454a"></span>反対</li>
-				<li><span class="sw" style="background:#e0a838"></span>棄権</li>
-				<li><span class="sw" style="background:#d7d9dd"></span>記録なし</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.yes}"></span>賛成</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.no}"></span>反対</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.abstain}"></span>棄権</li>
+				<li><span class="sw" style="background:{VOTE_COLORS.none}"></span>記録なし</li>
 			</ul>
 			<!-- When the layout stacks (narrow), 比例 sits below the map. Keep it in
 			     view with an anchor so it is never out of sight (§5 / 地図から消さない). -->
@@ -221,14 +222,16 @@
 	.opt {
 		font-size: 12px;
 	}
+	/* Factual category colours (neutral data-viz, not green=good/red=bad), keyed to the map
+	   (DESIGN_LANGUAGE §6). */
 	.opt-yes {
-		color: #2e9e5b;
+		color: var(--dv-1);
 	}
 	.opt-no {
-		color: #d2454a;
+		color: var(--dv-2);
 	}
 	.opt-abstain {
-		color: #e0a838;
+		color: var(--dv-4);
 	}
 	.blk {
 		font-size: 11px;

@@ -7,6 +7,7 @@
 	// district and are shown by the page's companion panel, never erased (§5).
 	import { onMount, onDestroy } from 'svelte';
 	import type { Vote } from '$lib/types';
+	import { VOTE_COLORS, MAP_BASE } from '$lib/voteColors';
 
 	let { votes = [] }: { votes?: Vote[] } = $props();
 
@@ -14,8 +15,6 @@
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let map: any;
 
-	const COLORS: Record<string, string> = { yes: '#2e9e5b', no: '#d2454a', abstain: '#e0a838' };
-	const NO_RECORD = '#d7d9dd';
 	const OPT_JA: Record<string, string> = { yes: '賛成', no: '反対', abstain: '棄権' };
 
 	// A MapLibre `match` expression colouring each district by its member's option.
@@ -29,10 +28,10 @@
 		}
 		const expr: unknown[] = ['match', ['get', 'kucode']];
 		for (const opt of ['yes', 'no', 'abstain']) {
-			if (groups[opt].length) expr.push(groups[opt], COLORS[opt]);
+			if (groups[opt].length) expr.push(groups[opt], VOTE_COLORS[opt]);
 		}
-		expr.push(NO_RECORD); // default = 記録なし
-		return expr.length > 3 ? expr : NO_RECORD;
+		expr.push(VOTE_COLORS.none); // default = 記録なし
+		return expr.length > 3 ? expr : VOTE_COLORS.none;
 	}
 
 	onMount(async () => {
@@ -53,7 +52,7 @@
 			style: {
 				version: 8,
 				sources: {},
-				layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0e1014' } }]
+				layers: [{ id: 'bg', type: 'background', paint: { 'background-color': MAP_BASE } }]
 			},
 			center: [137.5, 38.2],
 			zoom: 4,
@@ -91,7 +90,7 @@
 			id: 'outline',
 			type: 'line',
 			source: 'districts',
-			paint: { 'line-color': '#0e1014', 'line-width': 0.4 }
+			paint: { 'line-color': MAP_BASE, 'line-width': 0.4 }
 		});
 
 		const popup = new maplibregl.Popup({ closeButton: false });

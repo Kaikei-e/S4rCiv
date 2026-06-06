@@ -6,14 +6,13 @@
 	// in context on click (§7). The boundary GeoJSON is a static basemap, not data.
 	import { onMount, onDestroy } from 'svelte';
 	import type { PrefectureTally } from '$lib/types';
+	import { VOTE_COLORS, MAP_BASE } from '$lib/voteColors';
 
 	let { prefectures = [] }: { prefectures?: PrefectureTally[] } = $props();
 
 	let el: HTMLDivElement;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let map: any;
-
-	const COLORS = { yes: '#2e9e5b', no: '#d2454a', split: '#e0a838', none: '#d7d9dd' };
 
 	// match ['get','id'] → factual category. id is the JIS prefecture code; a 合区 tally
 	// ("31,32") is applied to both prefectures.
@@ -28,10 +27,10 @@
 		}
 		const expr: unknown[] = ['match', ['get', 'id']];
 		for (const k of ['yes', 'no', 'split'] as const) {
-			if (groups[k].length) expr.push(groups[k], COLORS[k]);
+			if (groups[k].length) expr.push(groups[k], VOTE_COLORS[k]);
 		}
-		expr.push(COLORS.none);
-		return expr.length > 3 ? expr : COLORS.none;
+		expr.push(VOTE_COLORS.none);
+		return expr.length > 3 ? expr : VOTE_COLORS.none;
 	}
 
 	onMount(async () => {
@@ -51,7 +50,7 @@
 			style: {
 				version: 8,
 				sources: {},
-				layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0e1014' } }]
+				layers: [{ id: 'bg', type: 'background', paint: { 'background-color': MAP_BASE } }]
 			},
 			center: [137.5, 38.2],
 			zoom: 4,
@@ -83,7 +82,7 @@
 			id: 'outline',
 			type: 'line',
 			source: 'pref',
-			paint: { 'line-color': '#0e1014', 'line-width': 0.4 }
+			paint: { 'line-color': MAP_BASE, 'line-width': 0.4 }
 		});
 
 		const popup = new maplibregl.Popup({ closeButton: false });

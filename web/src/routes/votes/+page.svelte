@@ -118,11 +118,14 @@
 	.res {
 		margin-right: 8px;
 	}
+	/* 可決/否決 is the overall RESULT — shown in a neutral colour, never green=good/red=bad
+	   (DESIGN_LANGUAGE §6/§10: "可決を緑で着色" is a ✗). The word carries the fact; colour
+	   carries no value. The distinct labels keep them legible without a value hue. */
 	.res-passed {
-		color: #2e9e5b;
+		color: var(--text-1);
 	}
 	.res-rejected {
-		color: #d2454a;
+		color: var(--text-1);
 	}
 	.res-unknown {
 		color: var(--text-3);
