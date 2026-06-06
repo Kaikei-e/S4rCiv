@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+#compose
+compose.tunnel.yaml
+
 # Go build artifacts
 /services/api/api
 
