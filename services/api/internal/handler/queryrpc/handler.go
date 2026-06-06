@@ -263,7 +263,7 @@ func (h *Handler) ListTimeline(ctx context.Context, req *connect.Request[queryv1
 		Classification: req.Msg.GetClassification(),
 		Since:          req.Msg.GetSince(),
 		Until:          req.Msg.GetUntil(),
-		Keyword:        req.Msg.GetKeyword(),
+		Keyword:        capKeyword(req.Msg.GetKeyword()),
 		CursorSeq:      cursorSeq,
 		Backward:       backward,
 		Limit:          limit + 1, // keyset over-fetch to detect a further page in the walk direction
@@ -586,6 +586,17 @@ func parseTimelineCursor(token string) (seq int64, backward bool) {
 		return 0, false
 	}
 	return n, backward
+}
+
+// maxKeywordRunes caps the free-text timeline filter so an over-long pattern can't
+// amplify the per-row ILIKE cost (CWE-400). 128 runes is far beyond any real query.
+const maxKeywordRunes = 128
+
+func capKeyword(s string) string {
+	if r := []rune(s); len(r) > maxKeywordRunes {
+		return string(r[:maxKeywordRunes])
+	}
+	return s
 }
 
 func parseOffset(token string) int {

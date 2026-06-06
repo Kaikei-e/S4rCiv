@@ -138,31 +138,39 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 	return out, nil
 }
 
-// CountTimeline computes the filter's total row count and how many of those rows
-// are newer than aboveSeq (seq > aboveSeq), mirroring ListTimeline's FROM/WHERE
-// exactly so the counts match the paged set. Keyset has no random page access, so
-// this feeds only the "n / N ページ・全 X 件" position display (ADR-000006). It is a
-// full filtered scan (unavoidable for an exact total); swap to an estimate
-// (pg_class.reltuples / EXPLAIN) if the log grows large enough to need it.
+// CountTimelineCap bounds how many rows CountTimeline will scan per request. The
+// count feeds only the "n / N ページ・全 X 件" orientation display (ADR-000006), so an
+// exact total past this point adds no navigational value while a full filtered scan
+// on every request is a query-amplification vector (CWE-400). Beyond the cap the
+// total is reported AS the cap (a "10000+" sentinel); raise it or switch to a
+// trigram index + reltuples estimate when the log outgrows it.
+const CountTimelineCap = 10000
+
+// CountTimeline computes the filter's total row count (bounded to CountTimelineCap)
+// and how many of those rows are newer than aboveSeq (seq > aboveSeq), mirroring
+// ListTimeline's FROM/WHERE exactly so the counts match the paged set. The inner
+// LIMIT caps the work each request can force; at M1 scale the count is exact.
 func (q *QueryReader) CountTimeline(ctx context.Context, f port.TimelineFilter, aboveSeq int64) (int, int, error) {
 	var total, above int
 	err := q.pool.QueryRow(ctx, `
-		SELECT
-		  count(*),
-		  count(*) FILTER (WHERE e.seq > $7)
-		FROM observation.event e
-		LEFT JOIN interpretation.meeting m           ON m.stream_id = e.stream_id
-		LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
-		LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
-		WHERE e.source IN ('kokkai', 'egov-law')
-		  AND ($1 = '' OR e.source = $1)
-		  AND ($2 = '' OR e.type::text = $2)
-		  AND ($3 = '' OR c.classification = $3)
-		  AND (NULLIF($4,'')::timestamptz IS NULL OR e.observed_at >= NULLIF($4,'')::timestamptz)
-		  AND (NULLIF($5,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($5,'')::timestamptz)
-		  AND ($6 = '' OR m.meeting_name ILIKE '%'||$6||'%' OR lw.law_title ILIKE '%'||$6||'%'
-		               OR lw.law_num ILIKE '%'||$6||'%' OR lw.category ILIKE '%'||$6||'%')`,
-		f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, aboveSeq,
+		SELECT count(*), count(*) FILTER (WHERE seq > $7)
+		FROM (
+		  SELECT e.seq AS seq
+		  FROM observation.event e
+		  LEFT JOIN interpretation.meeting m           ON m.stream_id = e.stream_id
+		  LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
+		  LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
+		  WHERE e.source IN ('kokkai', 'egov-law')
+		    AND ($1 = '' OR e.source = $1)
+		    AND ($2 = '' OR e.type::text = $2)
+		    AND ($3 = '' OR c.classification = $3)
+		    AND (NULLIF($4,'')::timestamptz IS NULL OR e.observed_at >= NULLIF($4,'')::timestamptz)
+		    AND (NULLIF($5,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($5,'')::timestamptz)
+		    AND ($6 = '' OR m.meeting_name ILIKE '%'||$6||'%' OR lw.law_title ILIKE '%'||$6||'%'
+		                 OR lw.law_num ILIKE '%'||$6||'%' OR lw.category ILIKE '%'||$6||'%')
+		  LIMIT $8
+		) capped`,
+		f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, aboveSeq, CountTimelineCap,
 	).Scan(&total, &above)
 	if err != nil {
 		return 0, 0, err

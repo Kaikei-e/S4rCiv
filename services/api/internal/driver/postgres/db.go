@@ -23,8 +23,11 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
+	// sslmode=prefer: use TLS when the server offers it, transparently falling back
+	// to plaintext on the current no-TLS compose DB (no breakage). Set sslmode=require
+	// once the DB is reachable beyond the private compose network (CWE-319).
 	dsn := fmt.Sprintf(
-		"postgres://%s:%s@%s/%s?sslmode=disable",
+		"postgres://%s:%s@%s/%s?sslmode=prefer",
 		envOr("POSTGRES_USER", "s4rciv"),
 		pw,
 		net.JoinHostPort(envOr("POSTGRES_HOST", "db"), envOr("POSTGRES_PORT", "5432")),
