@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: true
+
+# Force the transitive `cookie` dep to the patched line. @sveltejs/kit pins
+# cookie@^0.6.0 (even at latest), which excludes the 0.7.0 fix for the
+# out-of-bounds-character advisory, so we override it here (GHSA cookie <0.7.0).
+overrides:
+  cookie@<0.7.0: '^0.7.0'
