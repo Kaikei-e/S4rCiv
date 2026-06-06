@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { getLaw, getLawChanges, getStreamVerification } from '$lib/server/queryClient';
+import { rpcError } from '$lib/server/errors';
 import type { StreamVerificationJson } from '$lib/verification/verifier';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -8,7 +9,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	try {
 		[law, changes] = await Promise.all([getLaw(params.lawId), getLawChanges(params.lawId)]);
 	} catch (e) {
-		throw error(404, e instanceof Error ? e.message : '法令の取得に失敗しました');
+		rpcError(e, '法令が見つかりません');
 	}
 	if (!law.law) throw error(404, '法令が見つかりません');
 

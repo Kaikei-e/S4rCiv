@@ -27,6 +27,9 @@ export const load: PageServerLoad = async ({ url }) => {
 			error: null as string | null
 		};
 	} catch (e) {
+		// Render the page with an empty timeline + a generic banner; never surface the
+		// upstream/DB error text to the browser (CWE-209). Detail is logged server-side.
+		console.error('[timeline] RPC failed:', e);
 		return {
 			items: [] as TimelineItem[],
 			nextPageToken: '',
@@ -35,7 +38,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			page: 0,
 			pageSize: 50,
 			filters,
-			error: e instanceof Error ? e.message : 'タイムラインの取得に失敗しました'
+			error: '一時的に取得できませんでした。時間をおいて再度お試しください。'
 		};
 	}
 };

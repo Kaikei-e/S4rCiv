@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { getMeeting, getStreamVerification } from '$lib/server/queryClient';
+import { rpcError } from '$lib/server/errors';
 import type { StreamVerificationJson } from '$lib/verification/verifier';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -8,7 +9,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	try {
 		res = await getMeeting(params.issueId);
 	} catch (e) {
-		throw error(404, e instanceof Error ? e.message : '会議録の取得に失敗しました');
+		rpcError(e, '会議録が見つかりません');
 	}
 	if (!res.meeting) throw error(404, '会議録が見つかりません');
 
