@@ -3029,3 +3029,163 @@ export class GetMastheadStatusResponse extends Message<GetMastheadStatusResponse
   }
 }
 
+/**
+ * @generated from message s4rciv.query.v1.ListCheckpointsRequest
+ */
+export class ListCheckpointsRequest extends Message<ListCheckpointsRequest> {
+  /**
+   * newest N; server caps and defaults this
+   *
+   * @generated from field: int32 limit = 1;
+   */
+  limit = 0;
+
+  constructor(data?: PartialMessage<ListCheckpointsRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.ListCheckpointsRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "limit", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListCheckpointsRequest {
+    return new ListCheckpointsRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListCheckpointsRequest {
+    return new ListCheckpointsRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListCheckpointsRequest {
+    return new ListCheckpointsRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListCheckpointsRequest | PlainMessage<ListCheckpointsRequest> | undefined, b: ListCheckpointsRequest | PlainMessage<ListCheckpointsRequest> | undefined): boolean {
+    return proto3.util.equals(ListCheckpointsRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message s4rciv.query.v1.ListCheckpointsResponse
+ */
+export class ListCheckpointsResponse extends Message<ListCheckpointsResponse> {
+  /**
+   * newest first
+   *
+   * @generated from field: repeated s4rciv.query.v1.SignedCheckpoint checkpoints = 1;
+   */
+  checkpoints: SignedCheckpoint[] = [];
+
+  constructor(data?: PartialMessage<ListCheckpointsResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.ListCheckpointsResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "checkpoints", kind: "message", T: SignedCheckpoint, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListCheckpointsResponse {
+    return new ListCheckpointsResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListCheckpointsResponse {
+    return new ListCheckpointsResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListCheckpointsResponse {
+    return new ListCheckpointsResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListCheckpointsResponse | PlainMessage<ListCheckpointsResponse> | undefined, b: ListCheckpointsResponse | PlainMessage<ListCheckpointsResponse> | undefined): boolean {
+    return proto3.util.equals(ListCheckpointsResponse, a, b);
+  }
+}
+
+/**
+ * One signed checkpoint, including the full C2SP signed-note bytes — the canonical
+ * artifact a third party verifies with the published key (ADR-000019).
+ *
+ * @generated from message s4rciv.query.v1.SignedCheckpoint
+ */
+export class SignedCheckpoint extends Message<SignedCheckpoint> {
+  /**
+   * @generated from field: int64 through_seq = 1;
+   */
+  throughSeq = protoInt64.zero;
+
+  /**
+   * @generated from field: int64 tree_size = 2;
+   */
+  treeSize = protoInt64.zero;
+
+  /**
+   * lowercase hex
+   *
+   * @generated from field: string root_hash = 3;
+   */
+  rootHash = "";
+
+  /**
+   * @generated from field: string alg_version = 4;
+   */
+  algVersion = "";
+
+  /**
+   * @generated from field: string signer_key_id = 5;
+   */
+  signerKeyId = "";
+
+  /**
+   * RFC3339 UTC
+   *
+   * @generated from field: string recorded_at = 6;
+   */
+  recordedAt = "";
+
+  /**
+   * the signed note (C2SP signed-note encoding)
+   *
+   * @generated from field: bytes signed_note = 7;
+   */
+  signedNote = new Uint8Array(0);
+
+  constructor(data?: PartialMessage<SignedCheckpoint>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "s4rciv.query.v1.SignedCheckpoint";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "through_seq", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 2, name: "tree_size", kind: "scalar", T: 3 /* ScalarType.INT64 */ },
+    { no: 3, name: "root_hash", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "alg_version", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "signer_key_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 6, name: "recorded_at", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 7, name: "signed_note", kind: "scalar", T: 12 /* ScalarType.BYTES */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SignedCheckpoint {
+    return new SignedCheckpoint().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SignedCheckpoint {
+    return new SignedCheckpoint().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SignedCheckpoint {
+    return new SignedCheckpoint().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SignedCheckpoint | PlainMessage<SignedCheckpoint> | undefined, b: SignedCheckpoint | PlainMessage<SignedCheckpoint> | undefined): boolean {
+    return proto3.util.equals(SignedCheckpoint, a, b);
+  }
+}
+

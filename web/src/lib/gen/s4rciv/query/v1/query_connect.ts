@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMastheadStatusRequest, GetMastheadStatusResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetStreamVerificationRequest, GetStreamVerificationResponse, GetVoteEventRequest, GetVoteEventResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
+import { GetLawChangesRequest, GetLawChangesResponse, GetLawRequest, GetLawResponse, GetMastheadStatusRequest, GetMastheadStatusResponse, GetMeetingRequest, GetMeetingResponse, GetSangiinVoteMapRequest, GetSangiinVoteMapResponse, GetStreamVerificationRequest, GetStreamVerificationResponse, GetVoteEventRequest, GetVoteEventResponse, ListCheckpointsRequest, ListCheckpointsResponse, ListLawsRequest, ListLawsResponse, ListLegislatorVotesRequest, ListLegislatorVotesResponse, ListMeetingsRequest, ListMeetingsResponse, ListSangiinVoteEventsRequest, ListSangiinVoteEventsResponse, ListTimelineRequest, ListTimelineResponse, ListVoteEventsRequest, ListVoteEventsResponse } from "./query_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -175,6 +175,21 @@ export const QueryService = {
       name: "GetMastheadStatus",
       I: GetMastheadStatusRequest,
       O: GetMastheadStatusResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ── Signed checkpoint feed for passive witnessing (ADR-000019) ───────────────
+     * The signed checkpoints, newest first, as full C2SP signed-note bytes. Exposed
+     * publicly (read-only) so third-party witnesses and archivers PULL them; S4rCiv
+     * never pushes (設計原則①). The bytes are the canonical artifact a third party
+     * verifies with the published key — not a self-graded "verified" flag.
+     *
+     * @generated from rpc s4rciv.query.v1.QueryService.ListCheckpoints
+     */
+    listCheckpoints: {
+      name: "ListCheckpoints",
+      I: ListCheckpointsRequest,
+      O: ListCheckpointsResponse,
       kind: MethodKind.Unary,
     },
   }

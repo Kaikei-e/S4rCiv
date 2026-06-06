@@ -9,12 +9,16 @@
 
 	// Map the masthead provenance into the component's props. Coverage is always real
 	// (control.watch count); the checkpoint lights up only once the generator (ADR-000019)
-	// has written one. verifyHref is left unset until the public checkpoint feed exists.
+	// has written one. ▸検証 points at the public signed-checkpoint feed (passive exposure).
 	const m = $derived(data?.masthead ?? null);
 	const coverage = $derived(m?.watchCount != null ? Number(m.watchCount) : undefined);
 	const checkpoint = $derived(
 		m?.hasCheckpoint && m.checkpoint
-			? { seq: Number(m.checkpoint.throughSeq ?? 0), observedAt: m.checkpoint.recordedAt }
+			? {
+					seq: Number(m.checkpoint.throughSeq ?? 0),
+					observedAt: m.checkpoint.recordedAt,
+					verifyHref: '/checkpoints'
+				}
 			: undefined
 	);
 </script>

@@ -283,3 +283,17 @@ export interface MastheadStatus {
 	hasCheckpoint?: boolean;
 	checkpoint?: MastheadCheckpoint;
 }
+
+// One signed checkpoint for the public passive-exposure feed (ADR-000019).
+export interface SignedCheckpoint {
+	throughSeq?: string;
+	treeSize?: string;
+	rootHash?: string;
+	algVersion?: string;
+	signerKeyId?: string;
+	recordedAt?: string;
+	signedNote?: string; // base64 (proto3 JSON bytes) of the C2SP signed-note
+}
+export interface ListCheckpointsResponse {
+	checkpoints?: SignedCheckpoint[];
+}

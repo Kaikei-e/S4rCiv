@@ -23,7 +23,8 @@ import type {
 	ListVoteEventsResponse,
 	ListSangiinVoteEventsResponse,
 	GetSangiinVoteMapResponse,
-	MastheadStatus
+	MastheadStatus,
+	ListCheckpointsResponse
 } from '$lib/types';
 // Type-only: the verifier owns the GetStreamVerification JSON shape so the panel
 // and this client agree on one definition. import type is erased — no runtime
@@ -98,4 +99,9 @@ export async function getStreamVerification(streamId: string): Promise<StreamVer
 // signed checkpoint, if one exists.
 export async function getMastheadStatus(): Promise<MastheadStatus> {
 	return json<MastheadStatus>(await client.getMastheadStatus({}));
+}
+
+// The signed checkpoint feed (ADR-000019), newest first, for passive exposure.
+export async function listCheckpoints(limit = 200): Promise<ListCheckpointsResponse> {
+	return json<ListCheckpointsResponse>(await client.listCheckpoints({ limit }));
 }
