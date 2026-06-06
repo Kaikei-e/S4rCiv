@@ -211,3 +211,85 @@ func TestParseLawXMLColumnAndSubitem(t *testing.T) {
 		}
 	}
 }
+
+// A snapshot can derive the same eId twice (a duplicated Article Num, or two 号 with
+// the same Num): real e-Gov XML occasionally does this. The eId contract requires
+// uniqueness within a Work version (it keys the diff and the law_node UNIQUE(law_id,
+// eid) read model), so ParseLawXML must disambiguate deterministically WITHOUT
+// breaking parent/child linkage. Regression for the egov-law reproject crash
+// (law_node_eid_unique, SQLSTATE 23505).
+const dupEidFixtureXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Law>
+  <LawNum>令和五年政令第一号</LawNum>
+  <LawBody>
+    <LawTitle Kana="てすとせいれい">テスト政令</LawTitle>
+    <MainProvision>
+      <Article Num="1">
+        <ArticleTitle>第一条</ArticleTitle>
+        <Paragraph Num="1">
+          <ParagraphSentence><Sentence>第一条第一項。</Sentence></ParagraphSentence>
+          <Item Num="1"><ItemSentence><Sentence>一号。</Sentence></ItemSentence></Item>
+          <Item Num="1"><ItemSentence><Sentence>重複した一号。</Sentence></ItemSentence></Item>
+        </Paragraph>
+      </Article>
+      <Article Num="1">
+        <ArticleTitle>第一条（重複）</ArticleTitle>
+        <Paragraph Num="1">
+          <ParagraphSentence><Sentence>重複した第一条の本文。</Sentence></ParagraphSentence>
+        </Paragraph>
+      </Article>
+    </MainProvision>
+  </LawBody>
+</Law>`
+
+func TestParseLawXMLDeduplicatesEids(t *testing.T) {
+	c, err := ParseLawXML([]byte(dupEidFixtureXML))
+	if err != nil {
+		t.Fatalf("ParseLawXML: %v", err)
+	}
+
+	// 1) Every eId is unique (what law_node UNIQUE(law_id, eid) enforces; the reproject
+	//    crash was a duplicate getting through).
+	seen := map[string]int{}
+	for _, n := range c.Nodes {
+		seen[n.EID]++
+	}
+	for eid, n := range seen {
+		if n > 1 {
+			t.Errorf("duplicate eid %q appears %d times — must be unique", eid, n)
+		}
+	}
+
+	byEID := map[string]LawNode{}
+	for _, n := range c.Nodes {
+		byEID[n.EID] = n
+	}
+
+	// 2) The duplicated leaf 号 is suffixed deterministically, both kept.
+	if _, ok := byEID["art_1__para_1__item_1"]; !ok {
+		t.Error("first 号 eid art_1__para_1__item_1 missing")
+	}
+	dupItem, ok := byEID["art_1__para_1__item_1~2"]
+	if !ok {
+		t.Fatal("duplicated 号 must be kept under a ~2 suffix, not dropped")
+	}
+	if dupItem.ParentEID != "art_1__para_1" {
+		t.Errorf("dup 号 parent = %q, want art_1__para_1", dupItem.ParentEID)
+	}
+
+	// 3) The duplicated Article is suffixed, and ITS child paragraph links to the
+	//    suffixed parent — linkage is preserved, not pointed at the first article.
+	if _, ok := byEID["art_1"]; !ok {
+		t.Error("first article eid art_1 missing")
+	}
+	if _, ok := byEID["art_1~2"]; !ok {
+		t.Fatal("duplicated article must be kept under a ~2 suffix")
+	}
+	dupArtPara, ok := byEID["art_1~2__para_1"]
+	if !ok {
+		t.Fatal("the duplicated article's paragraph must derive from the suffixed eid")
+	}
+	if dupArtPara.ParentEID != "art_1~2" {
+		t.Errorf("dup article paragraph parent = %q, want art_1~2 (linkage preserved)", dupArtPara.ParentEID)
+	}
+}

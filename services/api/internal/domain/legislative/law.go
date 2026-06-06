@@ -273,10 +273,31 @@ type scope struct {
 	sectionNum string
 }
 
-// builder accumulates nodes with a single document-order ordinal counter.
+// builder accumulates nodes with a single document-order ordinal counter and the
+// set of eIds already emitted, so derived eIds can be kept unique (see uniq).
 type builder struct {
 	nodes   []LawNode
 	ordinal int
+	used    map[string]bool
+}
+
+// uniq returns base, or base with a deterministic "~N" suffix when base was already
+// emitted in this parse. The eId contract requires uniqueness within a Work version
+// (it is the cross-version diff key), but a snapshot can derive the same eId twice
+// (e.g. a duplicated Num), which would break the law_node UNIQUE(law_id, eid) read
+// model and the diff. uniq is order-stable — the same snapshot always yields the same
+// eIds — so reproject stays deterministic. Callers thread the returned eId down as the
+// children's prefix and ParentEID, so parent/child linkage is preserved.
+func (b *builder) uniq(base string) string {
+	if b.used == nil {
+		b.used = map[string]bool{}
+	}
+	cand := base
+	for i := 2; b.used[cand]; i++ {
+		cand = base + "~" + strconv.Itoa(i)
+	}
+	b.used[cand] = true
+	return cand
 }
 
 func (b *builder) add(n LawNode) {
@@ -350,7 +371,7 @@ func walkContainer(b *builder, c xmlContainer, eidPrefix string, sc scope, kind 
 
 func walkArticle(b *builder, a xmlArticle, eidPrefix string, sc scope) {
 	isSuppl := eidPrefix != ""
-	artEID := eidPrefix + "art_" + a.Num
+	artEID := b.uniq(eidPrefix + "art_" + a.Num)
 	caption := strings.TrimSpace(a.Caption)
 
 	// An article with no paragraphs still materializes, carrying its body text.
@@ -375,7 +396,7 @@ func walkArticle(b *builder, a xmlArticle, eidPrefix string, sc scope) {
 		if num == "" {
 			num = strconv.Itoa(i + 1) // default to the 1-based ordinal
 		}
-		paraEID := artEID + "__para_" + num
+		paraEID := b.uniq(artEID + "__para_" + num)
 		b.add(LawNode{
 			EID:          paraEID,
 			ParentEID:    artEID,
@@ -391,7 +412,7 @@ func walkArticle(b *builder, a xmlArticle, eidPrefix string, sc scope) {
 			if inum == "" {
 				inum = strconv.Itoa(j + 1)
 			}
-			itemEID := paraEID + "__item_" + inum
+			itemEID := b.uniq(paraEID + "__item_" + inum)
 			b.add(LawNode{
 				EID:          itemEID,
 				ParentEID:    paraEID,
@@ -417,7 +438,7 @@ func walkSubitem(b *builder, su xmlSubitem, parentEID string, sibling int, sc sc
 	if num == "" {
 		num = strconv.Itoa(sibling)
 	}
-	eid := parentEID + "__subitem" + strconv.Itoa(su.Level) + "_" + num
+	eid := b.uniq(parentEID + "__subitem" + strconv.Itoa(su.Level) + "_" + num)
 	b.add(LawNode{
 		EID:          eid,
 		ParentEID:    parentEID,
