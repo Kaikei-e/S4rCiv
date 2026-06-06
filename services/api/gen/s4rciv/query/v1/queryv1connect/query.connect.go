@@ -66,6 +66,9 @@ const (
 	// QueryServiceGetStreamVerificationProcedure is the fully-qualified name of the QueryService's
 	// GetStreamVerification RPC.
 	QueryServiceGetStreamVerificationProcedure = "/s4rciv.query.v1.QueryService/GetStreamVerification"
+	// QueryServiceGetMastheadStatusProcedure is the fully-qualified name of the QueryService's
+	// GetMastheadStatus RPC.
+	QueryServiceGetMastheadStatusProcedure = "/s4rciv.query.v1.QueryService/GetMastheadStatus"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -83,6 +86,7 @@ var (
 	queryServiceGetSangiinVoteMapMethodDescriptor     = queryServiceServiceDescriptor.Methods().ByName("GetSangiinVoteMap")
 	queryServiceListLegislatorVotesMethodDescriptor   = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
 	queryServiceGetStreamVerificationMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("GetStreamVerification")
+	queryServiceGetMastheadStatusMethodDescriptor     = queryServiceServiceDescriptor.Methods().ByName("GetMastheadStatus")
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -129,6 +133,12 @@ type QueryServiceClient interface {
 	// one Stream; full genesis→head recomputation is delegated to third-party mirrors
 	// via export (the global log chain is impractical to replay per page load).
 	GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error)
+	// ── Masthead status (ADR-000018 / ADR-000019) ───────────────────────────────
+	// Global provenance for the masthead: watch coverage (how many Resources we watch)
+	// and the latest signed checkpoint, if one exists. This is NOT a self-graded
+	// "verified ✓" — the checkpoint is a commitment a third party verifies, never a
+	// claim by S4rCiv about itself (ADR-000014 / 設計原則①).
+	GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error)
 }
 
 // NewQueryServiceClient constructs a client for the s4rciv.query.v1.QueryService service. By
@@ -213,6 +223,12 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceGetStreamVerificationMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getMastheadStatus: connect.NewClient[v1.GetMastheadStatusRequest, v1.GetMastheadStatusResponse](
+			httpClient,
+			baseURL+QueryServiceGetMastheadStatusProcedure,
+			connect.WithSchema(queryServiceGetMastheadStatusMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -230,6 +246,7 @@ type queryServiceClient struct {
 	getSangiinVoteMap     *connect.Client[v1.GetSangiinVoteMapRequest, v1.GetSangiinVoteMapResponse]
 	listLegislatorVotes   *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
 	getStreamVerification *connect.Client[v1.GetStreamVerificationRequest, v1.GetStreamVerificationResponse]
+	getMastheadStatus     *connect.Client[v1.GetMastheadStatusRequest, v1.GetMastheadStatusResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -292,6 +309,11 @@ func (c *queryServiceClient) GetStreamVerification(ctx context.Context, req *con
 	return c.getStreamVerification.CallUnary(ctx, req)
 }
 
+// GetMastheadStatus calls s4rciv.query.v1.QueryService.GetMastheadStatus.
+func (c *queryServiceClient) GetMastheadStatus(ctx context.Context, req *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error) {
+	return c.getMastheadStatus.CallUnary(ctx, req)
+}
+
 // QueryServiceHandler is an implementation of the s4rciv.query.v1.QueryService service.
 type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
@@ -336,6 +358,12 @@ type QueryServiceHandler interface {
 	// one Stream; full genesis→head recomputation is delegated to third-party mirrors
 	// via export (the global log chain is impractical to replay per page load).
 	GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error)
+	// ── Masthead status (ADR-000018 / ADR-000019) ───────────────────────────────
+	// Global provenance for the masthead: watch coverage (how many Resources we watch)
+	// and the latest signed checkpoint, if one exists. This is NOT a self-graded
+	// "verified ✓" — the checkpoint is a commitment a third party verifies, never a
+	// claim by S4rCiv about itself (ADR-000014 / 設計原則①).
+	GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error)
 }
 
 // NewQueryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -416,6 +444,12 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceGetStreamVerificationMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceGetMastheadStatusHandler := connect.NewUnaryHandler(
+		QueryServiceGetMastheadStatusProcedure,
+		svc.GetMastheadStatus,
+		connect.WithSchema(queryServiceGetMastheadStatusMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/s4rciv.query.v1.QueryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case QueryServiceGetMeetingProcedure:
@@ -442,6 +476,8 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceListLegislatorVotesHandler.ServeHTTP(w, r)
 		case QueryServiceGetStreamVerificationProcedure:
 			queryServiceGetStreamVerificationHandler.ServeHTTP(w, r)
+		case QueryServiceGetMastheadStatusProcedure:
+			queryServiceGetMastheadStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -497,4 +533,8 @@ func (UnimplementedQueryServiceHandler) ListLegislatorVotes(context.Context, *co
 
 func (UnimplementedQueryServiceHandler) GetStreamVerification(context.Context, *connect.Request[v1.GetStreamVerificationRequest]) (*connect.Response[v1.GetStreamVerificationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetStreamVerification is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetMastheadStatus is not implemented"))
 }

@@ -236,4 +236,8 @@ type QueryReader interface {
 	// StreamVerification returns one Stream's full verifiable export for the
 	// in-browser verifier (ADR-000014). found=false when the stream has no events.
 	StreamVerification(ctx context.Context, streamID string) (StreamVerificationView, bool, error)
+	// MastheadStatus returns the watch coverage count (enabled Resources) and the
+	// latest checkpoint, if one exists, for the global provenance masthead
+	// (ADR-000018/000019). hasCheckpoint is false until the generator writes one.
+	MastheadStatus(ctx context.Context) (watchCount int64, latest CheckpointView, hasCheckpoint bool, err error)
 }

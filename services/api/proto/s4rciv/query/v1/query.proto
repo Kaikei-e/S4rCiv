@@ -56,6 +56,13 @@ service QueryService {
   // one Stream; full genesis→head recomputation is delegated to third-party mirrors
   // via export (the global log chain is impractical to replay per page load).
   rpc GetStreamVerification(GetStreamVerificationRequest) returns (GetStreamVerificationResponse);
+
+  // ── Masthead status (ADR-000018 / ADR-000019) ───────────────────────────────
+  // Global provenance for the masthead: watch coverage (how many Resources we watch)
+  // and the latest signed checkpoint, if one exists. This is NOT a self-graded
+  // "verified ✓" — the checkpoint is a commitment a third party verifies, never a
+  // claim by S4rCiv about itself (ADR-000014 / 設計原則①).
+  rpc GetMastheadStatus(GetMastheadStatusRequest) returns (GetMastheadStatusResponse);
 }
 
 // Provenance + source attribution attached to every projected record.
@@ -469,4 +476,15 @@ message GetStreamVerificationResponse {
   // this stream's internal consistency, which the panel states plainly.
   bool has_checkpoint = 5;
   VerificationCheckpoint checkpoint = 6;
+}
+
+message GetMastheadStatusRequest {}
+message GetMastheadStatusResponse {
+  // Number of enabled Resources we watch (control.watch) — coverage/scope, never a
+  // claim of completeness.
+  int64 watch_count = 1;
+  // The latest signed checkpoint, when one exists. has_checkpoint is false until the
+  // generator (ADR-000019) writes one; the masthead then shows only its stance line.
+  bool has_checkpoint = 2;
+  VerificationCheckpoint checkpoint = 3;
 }

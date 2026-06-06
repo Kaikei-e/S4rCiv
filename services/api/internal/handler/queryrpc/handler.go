@@ -553,6 +553,27 @@ func (h *Handler) GetStreamVerification(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(out), nil
 }
 
+func (h *Handler) GetMastheadStatus(ctx context.Context, _ *connect.Request[queryv1.GetMastheadStatusRequest]) (*connect.Response[queryv1.GetMastheadStatusResponse], error) {
+	watch, cp, has, err := h.reader.MastheadStatus(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.GetMastheadStatusResponse{WatchCount: watch}
+	if has {
+		out.HasCheckpoint = true
+		out.Checkpoint = &queryv1.VerificationCheckpoint{
+			ThroughSeq:  cp.ThroughSeq,
+			TreeSize:    cp.TreeSize,
+			RootHash:    cp.RootHash,
+			AlgVersion:  cp.AlgVersion,
+			Signed:      cp.Signed,
+			SignerKeyId: cp.SignerKeyID,
+			RecordedAt:  cp.RecordedAt.UTC().Format(time.RFC3339),
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
 func toAttribution(a port.Attribution) *queryv1.Attribution {
 	return &queryv1.Attribution{
 		Source:         a.Source,

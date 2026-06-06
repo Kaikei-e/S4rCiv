@@ -22,6 +22,9 @@ type fakeVerifReader struct {
 func (f fakeVerifReader) StreamVerification(context.Context, string) (port.StreamVerificationView, bool, error) {
 	return f.view, f.found, nil
 }
+func (fakeVerifReader) MastheadStatus(context.Context) (int64, port.CheckpointView, bool, error) {
+	return 0, port.CheckpointView{}, false, nil
+}
 func (fakeVerifReader) Meeting(context.Context, string) (port.MeetingView, []port.SpeechView, bool, error) {
 	return port.MeetingView{}, nil, false, nil
 }
