@@ -26,6 +26,7 @@
 	import '$lib/styles/tokens.css';
 	import favicon from '$lib/assets/favicon.png';
 	import Masthead from '$lib/components/Masthead.svelte';
+	import SiteFooter from '$lib/components/SiteFooter.svelte';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 
@@ -54,6 +55,7 @@
 <a class="skip" href="#main">本文へスキップ</a>
 <Masthead {coverage} {checkpoint} />
 {@render children()}
+<SiteFooter />
 
 <style>
 	/* Keyboard skip link (WCAG 2.4.1 / DESIGN_LANGUAGE §8). */
