@@ -16,9 +16,9 @@ describe('Masthead', () => {
 		expect(screen.getByRole('link', { name: '購読' })).toHaveAttribute('href', '/timeline.atom');
 	});
 
-	it('states the passive stance', () => {
+	it('states the passive, non-judging stance in plain language', () => {
 		render(Masthead);
-		expect(screen.getByText(/受動観測・判断しない/)).toBeInTheDocument();
+		expect(screen.getByText(/観測した事実を記録し、判断はしない/)).toBeInTheDocument();
 	});
 
 	it('uses no emoji and never self-claims "verified" or "running"', () => {

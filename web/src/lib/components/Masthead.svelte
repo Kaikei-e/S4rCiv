@@ -42,7 +42,7 @@
 	</nav>
 
 	<p class="ledger mono">
-		<span class="stance">受動観測・判断しない</span>
+		<span class="stance">観測した事実を記録し、判断はしない</span>
 		{#if coverageLabel}
 			<span class="sep" aria-hidden="true">·</span><span class="cov">{coverageLabel}</span>
 		{/if}
