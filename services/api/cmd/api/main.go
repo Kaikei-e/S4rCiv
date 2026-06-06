@@ -12,6 +12,8 @@ import (
 	"os"
 	"time"
 
+	"connectrpc.com/connect"
+
 	queryv1connect "s4rciv.org/api/gen/s4rciv/query/v1/queryv1connect"
 	"s4rciv.org/api/internal/driver/postgres"
 	"s4rciv.org/api/internal/handler/queryrpc"
@@ -33,7 +35,9 @@ func main() {
 
 	handler := queryrpc.New(postgres.NewQueryReader(pool), postgres.NewLawQueryReader(pool))
 	mux := http.NewServeMux()
-	mux.Handle(queryv1connect.NewQueryServiceHandler(handler))
+	// SanitizeErrors keeps raw internal/DB error detail out of RPC responses (CWE-209);
+	// the BFF/browser only ever sees a generic message for Internal/Unknown failures.
+	mux.Handle(queryv1connect.NewQueryServiceHandler(handler, connect.WithInterceptors(queryrpc.SanitizeErrors())))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
@@ -48,7 +52,17 @@ func main() {
 	})
 
 	addr := ":" + envOr("API_PORT", "8080")
-	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	// Bound every phase of a connection so a slow client cannot tie up server
+	// resources indefinitely (CWE-400). All RPCs are unary and read-only, so these
+	// are generous: header 5s, full request 15s, response 30s, idle keep-alive 60s.
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	log.Printf("api listening on %s", addr)
 	log.Fatal(srv.ListenAndServe())
 }
