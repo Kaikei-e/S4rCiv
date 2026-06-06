@@ -25,6 +25,14 @@
 	const prevHref = $derived(data.prevPageToken ? qs({ page: data.prevPageToken }) || '?' : '');
 	const nextHref = $derived(data.nextPageToken ? qs({ page: data.nextPageToken }) || '?' : '');
 	const totalPages = $derived(Math.max(1, Math.ceil((data.totalCount || 0) / (data.pageSize || 50))));
+
+	// On narrow screens the filter form collapses into a <details> disclosure
+	// (DESIGN_LANGUAGE §9.2); the summary surfaces which filters are active so the
+	// collapsed state never hides that the timeline is being narrowed.
+	const activeFilterCount = $derived(
+		[data.filters.source, data.filters.eventType, data.filters.classification, data.filters.keyword]
+			.filter(Boolean).length
+	);
 </script>
 
 <svelte:head>
@@ -48,7 +56,14 @@
 </header>
 
 <main id="main" class="wrap">
-	<form class="filters" method="GET" action="/">
+	<details class="filterbox">
+		<summary>
+			<span class="label">絞り込み</span>
+			{#if activeFilterCount > 0}
+				<span class="active mono">適用中 {activeFilterCount}</span>
+			{/if}
+		</summary>
+		<form class="filters" method="GET" action="/">
 		<label>
 			<span class="label">ソース</span>
 			<select name="source" value={data.filters.source}>
@@ -80,7 +95,8 @@
 			<input name="q" type="search" value={data.filters.keyword} placeholder="例: 刑法 / 予算" />
 		</label>
 		<button type="submit">絞り込む</button>
-	</form>
+		</form>
+	</details>
 
 	<section class="panel" aria-label="横断タイムライン">
 		<div class="panel-head">
@@ -128,7 +144,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 16px;
+		flex-wrap: wrap;
+		gap: 12px 16px;
 		padding: 12px 24px;
 		border-bottom: 1px solid var(--hairline-2);
 		background: var(--surface-1);
@@ -174,12 +191,60 @@
 		margin: 0 auto;
 		padding: 24px;
 	}
+	/* Filter disclosure: collapsed on narrow (native <details>), always-open inline
+	   on wide (DESIGN_LANGUAGE §9.2). */
+	.filterbox {
+		margin-bottom: 20px;
+	}
+	.filterbox > summary {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		cursor: pointer;
+		padding: 8px 0;
+		list-style: none;
+	}
+	.filterbox > summary::-webkit-details-marker {
+		display: none;
+	}
+	.filterbox > summary::before {
+		content: '▸';
+		color: var(--text-3);
+	}
+	.filterbox[open] > summary::before {
+		content: '▾';
+	}
+	.filterbox .active {
+		font-size: 12px;
+		color: var(--st-changed-t);
+	}
 	.filters {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: end;
 		gap: 12px;
-		margin-bottom: 20px;
+	}
+	/* Wide: no disclosure — filters are always visible inline. (mirrors --bp-lg 55rem) */
+	@media (min-width: 55rem) {
+		.filterbox > summary {
+			display: none;
+		}
+		.filterbox > .filters {
+			display: flex !important;
+		}
+	}
+	/* Narrow: stack each control full-width. (mirrors --bp-sm 30rem) */
+	@media (max-width: 30rem) {
+		.wrap {
+			padding: 16px;
+		}
+		.filters {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.filters .grow {
+			min-width: 0;
+		}
 	}
 	.filters label {
 		display: flex;
@@ -266,5 +331,38 @@
 		margin-top: 20px;
 		font-size: 12px;
 		color: var(--text-3);
+	}
+	/* Establish a query container so ChangeLogItem reflows to its own width,
+	   not the viewport's (DESIGN_LANGUAGE §9.2). */
+	.list {
+		container-type: inline-size;
+		container-name: timeline;
+	}
+	/* Narrow skeleton: stack brand over nav, drop the decorative tagline. */
+	@media (max-width: 30rem) {
+		.topbar {
+			flex-direction: column;
+			align-items: flex-start;
+			padding: 12px 16px;
+		}
+		.brand h1 .label {
+			display: none;
+		}
+		.topnav {
+			width: 100%;
+		}
+	}
+	/* Touch: enlarge link targets to ≥44px (DESIGN_LANGUAGE §9.3 / WCAG 2.5.5). */
+	@media (pointer: coarse) {
+		.navlink,
+		.feed,
+		.pg {
+			min-height: 44px;
+			display: inline-flex;
+			align-items: center;
+		}
+		.filterbox > summary {
+			min-height: 44px;
+		}
 	}
 </style>

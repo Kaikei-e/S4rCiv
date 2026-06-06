@@ -46,6 +46,12 @@
 	--r: 7px;
 	--r-lg: 11px;
 
+	/* breakpoints (DESIGN_LANGUAGE §9.1; container-query-first, --bp-lg mirrors the
+	   legacy 880px map-grid collapse). Used by @container and skeleton @media alike. */
+	--bp-sm: 30rem; /* 480px */
+	--bp-md: 48rem; /* 768px */
+	--bp-lg: 55rem; /* 880px */
+
 	/* type */
 	--font-sans: 'IBM Plex Sans JP', 'IBM Plex Sans', system-ui, sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -125,6 +131,23 @@ a {
 :focus-visible {
 	outline: 2px solid var(--focus);
 	outline-offset: 2px;
+}
+
+/* Touch ergonomics (DESIGN_LANGUAGE §9.3 / WCAG 2.5.5). Coarse pointers get
+   ≥44px targets; fine pointers (mouse) keep the dense desktop sizing untouched.
+   Inline prose links are sized per-component so body text is not inflated. */
+@media (pointer: coarse) {
+	button,
+	select,
+	input,
+	textarea {
+		min-height: 44px;
+	}
+	/* maplibre zoom/nav buttons */
+	.maplibregl-ctrl button {
+		width: 40px;
+		height: 40px;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {

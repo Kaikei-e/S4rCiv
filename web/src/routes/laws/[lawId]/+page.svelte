@@ -83,6 +83,11 @@
 		margin: 0 auto;
 		padding: 24px;
 	}
+	@media (max-width: 30rem) {
+		.wrap {
+			padding: 16px;
+		}
+	}
 	.back {
 		font-size: 13px;
 		text-decoration: none;

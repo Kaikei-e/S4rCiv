@@ -55,13 +55,18 @@
 				<li><span class="sw" style="background:#e0a838"></span>棄権</li>
 				<li><span class="sw" style="background:#d7d9dd"></span>記録なし</li>
 			</ul>
+			<!-- When the layout stacks (narrow), 比例 sits below the map. Keep it in
+			     view with an anchor so it is never out of sight (§5 / 地図から消さない). -->
+			{#if prCount > 0}
+				<a class="pr-jump" href="#pr-panel">比例選出 {prCount}名 ↓</a>
+			{/if}
 			<!-- §5 / §7: be explicit about what the map does NOT show. -->
 			<p class="note">
 				記名投票のあった議案のみ地図化しています。色は「その区の現職がどう投じたか」の事実カテゴリで、集計スコアや賛同率ではありません。「記録なし」の区は、現職の記名投票記録が無い・未同定、または直近総選挙より前の構成です（地図は現会期のレンズ、履歴は不変ログ／タイムラインが保持）。
 			</p>
 		</section>
 
-		<aside class="prcol" aria-label="比例選出議員">
+		<aside class="prcol" id="pr-panel" aria-label="比例選出議員">
 			<h2 class="label">比例選出 <span class="cnt mono">{prCount}</span></h2>
 			<p class="sub">比例代表は選挙区を持たず地図に乗らないため併記します（§5）。</p>
 			{#each prByGroup() as [group, members] (group)}
@@ -123,9 +128,30 @@
 		gap: 22px;
 		align-items: start;
 	}
-	@media (max-width: 880px) {
+	.pr-jump {
+		display: none;
+	}
+	/* Below --bp-lg (55rem) the 比例 panel stacks under the map; surface the jump. */
+	@media (max-width: 55rem) {
 		.grid {
 			grid-template-columns: 1fr;
+		}
+		.pr-jump {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			margin-top: 12px;
+			font-size: 13px;
+			padding: 6px 10px;
+			border: 1px solid var(--hairline-2);
+			border-radius: var(--r-sm);
+			text-decoration: none;
+			color: var(--text-2);
+		}
+	}
+	@media (max-width: 30rem) {
+		.wrap {
+			padding: 16px;
 		}
 	}
 	.legend {

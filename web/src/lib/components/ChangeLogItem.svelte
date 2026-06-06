@@ -84,20 +84,43 @@
 	.item {
 		display: grid;
 		grid-template-columns: 8.5em 1.5em 1fr;
+		grid-template-areas: 'time node body';
 		gap: 12px;
 		padding: 14px 0;
 		border-bottom: 1px solid var(--hairline);
 	}
 	.time {
+		grid-area: time;
 		font-size: 12px;
 		color: var(--text-3);
 		padding-top: 2px;
 		white-space: nowrap;
 	}
 	.node {
+		grid-area: node;
 		display: flex;
 		justify-content: center;
 		padding-top: 1px;
+	}
+	/* Narrow container (mirrors --bp-sm 30rem): the status node + timestamp collapse
+	   to a top meta row; the body spans full width below. Multi-encoding (colour +
+	   glyph + label) is preserved — DESIGN_LANGUAGE §9.2. */
+	@container timeline (max-width: 30rem) {
+		.item {
+			grid-template-columns: auto 1fr;
+			grid-template-areas:
+				'node time'
+				'body body';
+			gap: 4px 8px;
+			align-items: center;
+		}
+		.node {
+			justify-content: flex-start;
+			padding-top: 0;
+		}
+		.time {
+			padding-top: 0;
+		}
 	}
 	.dot {
 		color: var(--t);
@@ -105,6 +128,7 @@
 		line-height: 1.2;
 	}
 	.body {
+		grid-area: body;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;

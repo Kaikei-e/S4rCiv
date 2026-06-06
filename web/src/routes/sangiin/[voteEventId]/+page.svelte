@@ -19,6 +19,7 @@
 	});
 
 	const unmatched = $derived((m.totalVotes ?? 0) - (m.matchedVotes ?? 0));
+	const prCount = $derived((m.prVotes ?? []).length);
 </script>
 
 <svelte:head><title>{m.motion || m.voteEventId} — 参議院記名投票地図 — S4rCiv</title></svelte:head>
@@ -42,6 +43,10 @@
 				<li><span class="sw" style="background:#e0a838"></span>割れ</li>
 				<li><span class="sw" style="background:#d7d9dd"></span>記録なし</li>
 			</ul>
+			<!-- Narrow layout stacks 比例（全国区）below the map; keep it in view (§5). -->
+			{#if prCount > 0}
+				<a class="pr-jump" href="#pr-panel">比例（全国区） {prCount}名 ↓</a>
+			{/if}
 			<p class="note">
 				色は「その県選出議員の賛否が割れたか／揃ったか」という事実カテゴリで、賛同率の色分けではありません（§3/§5-C）。賛成・反対の内訳は県をクリックで表示します。比例（全国区）は選挙区を持たないため右に併記します（§5）。
 				{#if unmatched > 0}
@@ -50,8 +55,8 @@
 			</p>
 		</section>
 
-		<aside class="prcol" aria-label="比例選出議員">
-			<h2 class="label">比例（全国区） <span class="cnt mono">{(m.prVotes ?? []).length}</span></h2>
+		<aside class="prcol" id="pr-panel" aria-label="比例選出議員">
+			<h2 class="label">比例（全国区） <span class="cnt mono">{prCount}</span></h2>
 			{#each prByGroup() as [group, members] (group)}
 				<div class="grp">
 					<div class="grpname">{group} <span class="cnt mono">{members.length}</span></div>
@@ -101,9 +106,30 @@
 		gap: 22px;
 		align-items: start;
 	}
-	@media (max-width: 880px) {
+	.pr-jump {
+		display: none;
+	}
+	/* Below --bp-lg (55rem) the 比例 panel stacks under the map; surface the jump. */
+	@media (max-width: 55rem) {
 		.grid {
 			grid-template-columns: 1fr;
+		}
+		.pr-jump {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			margin-top: 12px;
+			font-size: 13px;
+			padding: 6px 10px;
+			border: 1px solid var(--hairline-2);
+			border-radius: var(--r-sm);
+			text-decoration: none;
+			color: var(--text-2);
+		}
+	}
+	@media (max-width: 30rem) {
+		.wrap {
+			padding: 16px;
 		}
 	}
 	.legend {

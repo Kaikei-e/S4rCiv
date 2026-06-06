@@ -55,7 +55,14 @@
 			},
 			center: [137.5, 38.2],
 			zoom: 4,
-			attributionControl: false
+			attributionControl: false,
+			// One finger scrolls the page, two fingers pan/zoom (DESIGN_LANGUAGE §9.4).
+			cooperativeGestures: true,
+			locale: {
+				'CooperativeGesturesHandler.MobileHelpText': '2本指で地図を移動',
+				'CooperativeGesturesHandler.WindowsHelpText': 'Ctrl + スクロールでズーム',
+				'CooperativeGesturesHandler.MacHelpText': '⌘ + スクロールでズーム'
+			}
 		});
 		map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 		map.addControl(
@@ -104,14 +111,22 @@
 <style>
 	.map {
 		width: 100%;
-		height: 520px;
+		/* Shorter on phones so the map never fills the viewport (§9.4). */
+		height: clamp(360px, 60vh, 520px);
 		border-radius: 8px;
 		overflow: hidden;
 		border: 1px solid var(--hairline-2);
 	}
+	/* Popup themed to the dark token surface (§9.4) — was a light card before. */
 	:global(.maplibregl-popup-content) {
-		color: #15171c;
+		background: var(--surface-3);
+		color: var(--text-1);
+		border: 1px solid var(--hairline-2);
+		border-radius: var(--r-sm);
 		font-size: 13px;
 		line-height: 1.5;
+	}
+	:global(.maplibregl-popup-tip) {
+		display: none;
 	}
 </style>
