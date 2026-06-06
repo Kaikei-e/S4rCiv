@@ -48,18 +48,6 @@
 	/>
 </svelte:head>
 
-<header class="topbar">
-	<div class="brand">
-		<span class="dot" aria-hidden="true">◉</span>
-		<h1>S4rCiv： サーシヴ <span class="label">公的記録の可視化・追跡</span></h1>
-	</div>
-	<nav class="topnav">
-		<a class="navlink" href="/votes" title="衆院の記名投票を小選挙区別に地図で見る">🗺 衆院</a>
-		<a class="navlink" href="/sangiin" title="参院の記名投票を都道府県別に地図で見る">🗺 参院</a>
-		<a class="feed" href={feedHref} title="この絞り込みの Atom フィードを購読（ウォッチ）">📡 RSS</a>
-	</nav>
-</header>
-
 <main id="main" class="wrap">
 	<div class="filterbox">
 		<button
@@ -111,8 +99,9 @@
 
 	<section class="panel" aria-label="横断タイムライン">
 		<div class="panel-head">
-			<span class="label">横断タイムライン</span>
+			<span class="label">横断タイムライン<span class="tz">（時刻 JST）</span></span>
 			<span class="count mono">全 {data.totalCount.toLocaleString()} 件</span>
+			<a class="feed" href={feedHref} title="この絞り込みの Atom フィードを購読（ウォッチ）">購読</a>
 		</div>
 
 		{#if data.error}
@@ -151,52 +140,6 @@
 </main>
 
 <style>
-	.topbar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		flex-wrap: wrap;
-		gap: 12px 16px;
-		padding: 12px 24px;
-		border-bottom: 1px solid var(--hairline-2);
-		background: var(--surface-1);
-	}
-	.brand {
-		display: flex;
-		align-items: baseline;
-		gap: 10px;
-	}
-	.brand .dot {
-		color: var(--st-info-t);
-	}
-	.brand h1 {
-		font-size: 21px;
-		font-weight: 700;
-		margin: 0;
-		display: flex;
-		align-items: baseline;
-		gap: 10px;
-	}
-	.topnav {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-	.feed,
-	.navlink {
-		font-size: 12px;
-		padding: 4px 10px;
-		border: 1px solid var(--hairline-2);
-		border-radius: var(--r-sm);
-		text-decoration: none;
-		color: var(--text-2);
-		white-space: nowrap;
-	}
-	.feed:hover,
-	.navlink:hover {
-		color: var(--accent);
-		border-color: var(--accent);
-	}
 	.wrap {
 		max-width: 880px;
 		margin: 0 auto;
@@ -297,13 +240,34 @@
 	.panel-head {
 		display: flex;
 		align-items: baseline;
-		justify-content: space-between;
+		gap: 12px;
 		padding: 14px 0 6px;
 		border-bottom: 1px solid var(--hairline-2);
+	}
+	.panel-head .label {
+		margin-right: auto;
+	}
+	.tz {
+		color: var(--text-3);
+		font-weight: 400;
+		letter-spacing: 0;
 	}
 	.count {
 		font-size: 12px;
 		color: var(--text-3);
+	}
+	.feed {
+		font-size: 12px;
+		padding: 2px 8px;
+		border: 1px solid var(--hairline-2);
+		border-radius: var(--r-sm);
+		text-decoration: none;
+		color: var(--text-2);
+		white-space: nowrap;
+	}
+	.feed:hover {
+		color: var(--accent);
+		border-color: var(--accent);
 	}
 	.state {
 		color: var(--text-2);
@@ -354,23 +318,8 @@
 		container-type: inline-size;
 		container-name: timeline;
 	}
-	/* Narrow skeleton: stack brand over nav, drop the decorative tagline. */
-	@media (max-width: 30rem) {
-		.topbar {
-			flex-direction: column;
-			align-items: flex-start;
-			padding: 12px 16px;
-		}
-		.brand h1 .label {
-			display: none;
-		}
-		.topnav {
-			width: 100%;
-		}
-	}
 	/* Touch: enlarge link targets to ≥44px (DESIGN_LANGUAGE §9.3 / WCAG 2.5.5). */
 	@media (pointer: coarse) {
-		.navlink,
 		.feed,
 		.pg {
 			min-height: 44px;

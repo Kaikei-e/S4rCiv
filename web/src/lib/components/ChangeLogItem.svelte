@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TimelineItem } from '$lib/types';
 	import ProvenanceChip from './ProvenanceChip.svelte';
+	import { toJstMinute } from '$lib/time';
 
 	let { item }: { item: TimelineItem } = $props();
 
@@ -20,7 +21,9 @@
 		item.lawId ? `/laws/${item.lawId}` : item.issueId ? `/meetings/${item.issueId}` : undefined
 	);
 
-	const observedDay = $derived((item.observedAt ?? '').replace('T', ' ').slice(0, 16));
+	// observedAt is RFC3339 UTC; show it in JST (ADR-000018). The <time datetime> below
+	// keeps the raw UTC ISO for machines; the visible text is the JST-converted value.
+	const observedDay = $derived(toJstMinute(item.observedAt));
 	const hasCounts = $derived(
 		(item.nodesAdded ?? 0) + (item.nodesDeleted ?? 0) + (item.nodesModified ?? 0) > 0
 	);

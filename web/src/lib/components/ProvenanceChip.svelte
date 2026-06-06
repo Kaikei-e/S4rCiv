@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Attribution } from '$lib/types';
+	import { toJstMinute } from '$lib/time';
 
 	interface Props {
 		attr?: Attribution;
@@ -14,6 +15,10 @@
 	const { attr, verifyHref }: Props = $props();
 
 	const seq = $derived(attr?.observationSeq ? Number(attr.observationSeq) : undefined);
+	// fetchedAt is RFC3339 UTC; show it in JST with an explicit zone label (ADR-000018).
+	// Compose the whole label in the script so it stays a single text node.
+	const fetchedJst = $derived(toJstMinute(attr?.fetchedAt));
+	const fetchedLabel = $derived(fetchedJst ? `${fetchedJst} JST` : '—');
 </script>
 
 <div class="prov">
@@ -25,7 +30,7 @@
 		<span class="src">出典 {attr?.source ?? '—'}</span>
 	{/if}
 	<span class="sep" aria-hidden="true">·</span>
-	<span class="mono fetched">最終取得 {attr?.fetchedAt ?? '—'}</span>
+	<span class="mono fetched">最終取得 {fetchedLabel}</span>
 	{#if seq !== undefined}
 		<span class="sep" aria-hidden="true">·</span>
 		{#if verifyHref}

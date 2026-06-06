@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '$lib/styles/tokens.css';
 	import favicon from '$lib/assets/favicon.png';
+	import Masthead from '$lib/components/Masthead.svelte';
 
 	let { children } = $props();
 </script>
@@ -10,6 +11,7 @@
 </svelte:head>
 
 <a class="skip" href="#main">本文へスキップ</a>
+<Masthead />
 {@render children()}
 
 <style>

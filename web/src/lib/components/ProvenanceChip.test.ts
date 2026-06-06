@@ -24,9 +24,10 @@ describe('ProvenanceChip', () => {
 		expect(link.getAttribute('rel')).toContain('noopener');
 	});
 
-	it('shows the 最終取得 fetch timestamp', () => {
+	it('shows the 最終取得 fetch timestamp in JST (not raw UTC) — ADR-000018', () => {
 		render(ProvenanceChip, { props: { attr } });
-		expect(screen.getByText(/最終取得 2026-01-02T03:04:05Z/)).toBeInTheDocument();
+		// 2026-01-02T03:04:05Z (UTC) == 2026-01-02 12:04 in Asia/Tokyo.
+		expect(screen.getByText(/最終取得 2026-01-02 12:04 JST/)).toBeInTheDocument();
 	});
 
 	it('shows 記録 #seq as a plain citation handle when no verify link is given', () => {

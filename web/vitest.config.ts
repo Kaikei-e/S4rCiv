@@ -4,8 +4,9 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { svelteTesting } from '@testing-library/svelte/vite';
 
 // Two test projects with different needs:
-//   - verification: pure-TS CDC + unit tests (protobuf-es + WebCrypto + golden file).
-//     Runs under `node`; no SvelteKit plugin, avoiding its app-only resolution quirks.
+//   - verification: pure-TS CDC + unit tests (protobuf-es + WebCrypto + golden file),
+//     plus top-level $lib utilities (e.g. time.ts — Intl only, no DOM). Runs under
+//     `node`; no SvelteKit plugin, avoiding its app-only resolution quirks.
 //   - components: Svelte component tests under jsdom with Testing Library. The tested
 //     components import only `import type` from $lib (erased), so no SvelteKit alias
 //     resolution is needed at runtime. Browser-only components (MapLibre maps) and
@@ -20,7 +21,10 @@ export default defineConfig({
 				test: {
 					name: 'verification',
 					environment: 'node',
-					include: ['src/lib/verification/**/*.{test,spec}.ts']
+					include: [
+						'src/lib/verification/**/*.{test,spec}.ts',
+						'src/lib/*.{test,spec}.ts'
+					]
 				}
 			},
 			{

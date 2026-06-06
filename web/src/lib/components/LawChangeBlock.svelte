@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { LawChange, LawNode, LawNodeChange } from '$lib/types';
+	import { toJstDate } from '$lib/time';
 
 	let { change, nodes }: { change: LawChange; nodes: LawNode[] } = $props();
 
@@ -65,7 +66,7 @@
 			{isSubstantive ? '実質的変更' : '事務的変更'} · 自動分類(未レビュー)
 		</span>
 		{#if change.classConfidence}<span class="label">確信度 {change.classConfidence}</span>{/if}
-		<span class="mono when">観測 #{change.observationSeq} · {(change.observedAt ?? '').slice(0, 10)}</span>
+		<span class="mono when">観測 #{change.observationSeq} · {toJstDate(change.observedAt)}</span>
 	</header>
 
 	{#each groups as g (g.articleEid)}
