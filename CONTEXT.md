@@ -84,6 +84,22 @@ _Avoid_: 連結（鎖内にある事実と峻別）, レコード単位の「検
 log chain のある `seq` 時点の状態に対するコミットメント。完全性検証を「genesis から全件再計算」ではなく「直近チェックポイントから当該区間だけ再計算」に**有界化**し、各ユーザーの端末内検証を実用域に収める装置（全履歴の通し再計算は export 経由の第三者ミラーに委ねる）。§5 は定期・署名つきを要請する。`observation.checkpoint`（`alg_version` を保持、ADR-000003）。
 _Avoid_: スナップショット, セーブポイント
 
+**署名チェックポイント（signed checkpoint）**:
+チェックポイントを S4rCiv の鍵で署名したもの。第三者が「この連鎖コミットメントを S4rCiv が確かに発行した」ことを検証できる。フォーマットは相互運用のため **C2SP signed-note / tlog-checkpoint** を採用、署名は Ed25519（マウント secret 経由・env 不可、DB パスワードと同じ規律）。`alg_version` で **linked-v1**（`chain_head` を attest）→ **merkle-v1**（RFC 6962 Merkle root）へ進化。署名は TLS / Cloudflare Tunnel と独立で、公開鍵は OSS リポジトリで配布する。
+_Avoid_: 「検証済み」バッジ化（完全性検証と峻別）, 署名鍵を env に置くこと
+
+**Witness（証人）／ cosignature（連署）**:
+S4rCiv の署名チェックポイントを pull し、append-only consistency を検証して連署する独立した第三者。quorum の連署が split-view を阻止する。§5「自ログ改ざん疑義」を実際に担保するのは署名鍵の秘匿でなくこの witness 群であり、merkle-v1（consistency proof）で公開 witness 網に接続して初めて成立する。
+_Avoid_: S4rCiv 自身が witness を兼ねること（独立性が要件）
+
+**受動公開（passive exposure）**:
+署名チェックポイントを公開読み取りエンドポイントに晒し、witness・アーカイバに **pull** させる方式。S4rCiv は外部へ push しない。外部サービスへの能動書き込み（anchoring の push 実装）は設計原則①（受動・sentinel）に違反するため採らない。§5(L91) の「Internet Archive 経由で第三者証跡化」も pull の話。
+_Avoid_: 能動アンカリング（外部サービスへの push）, push 型 witness 連携
+
+**split-view / 自ログフォーク**:
+運用者が矛盾する2つの履歴（一方が他方の prefix でない）を別々の相手に見せる改ざん。S4rCiv 自身が改ざん＋再署名する脅威の核であり、Witness の quorum 連署がこれを retroactively に露見させる。
+_Avoid_: 単なる改ざん（split-view は「相手ごとに別の履歴」を指す）
+
 **Provenance（来歴）**:
 解釈面の各値が**どの観測イベントに由来するか**を指す参照。解釈面の全フィールドが provenance と confidence を必ず持つ。
 _Avoid_: lineage, origin
