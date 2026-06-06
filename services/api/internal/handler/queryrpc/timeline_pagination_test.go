@@ -89,6 +89,9 @@ func (fakeTimelineReader) StreamVerification(context.Context, string) (port.Stre
 func (fakeTimelineReader) MastheadStatus(context.Context) (int64, port.CheckpointView, bool, error) {
 	return 0, port.CheckpointView{}, false, nil
 }
+func (fakeTimelineReader) ListCheckpoints(context.Context, int) ([]port.SignedCheckpointView, error) {
+	return nil, nil
+}
 
 func TestListTimelineKeysetPagination(t *testing.T) {
 	// Full set: seq 10 (newest) … 1 (oldest), page size 3.

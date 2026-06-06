@@ -63,6 +63,13 @@ service QueryService {
   // "verified ✓" — the checkpoint is a commitment a third party verifies, never a
   // claim by S4rCiv about itself (ADR-000014 / 設計原則①).
   rpc GetMastheadStatus(GetMastheadStatusRequest) returns (GetMastheadStatusResponse);
+
+  // ── Signed checkpoint feed for passive witnessing (ADR-000019) ───────────────
+  // The signed checkpoints, newest first, as full C2SP signed-note bytes. Exposed
+  // publicly (read-only) so third-party witnesses and archivers PULL them; S4rCiv
+  // never pushes (設計原則①). The bytes are the canonical artifact a third party
+  // verifies with the published key — not a self-graded "verified" flag.
+  rpc ListCheckpoints(ListCheckpointsRequest) returns (ListCheckpointsResponse);
 }
 
 // Provenance + source attribution attached to every projected record.
@@ -487,4 +494,22 @@ message GetMastheadStatusResponse {
   // generator (ADR-000019) writes one; the masthead then shows only its stance line.
   bool has_checkpoint = 2;
   VerificationCheckpoint checkpoint = 3;
+}
+
+message ListCheckpointsRequest {
+  int32 limit = 1; // newest N; server caps and defaults this
+}
+message ListCheckpointsResponse {
+  repeated SignedCheckpoint checkpoints = 1; // newest first
+}
+// One signed checkpoint, including the full C2SP signed-note bytes — the canonical
+// artifact a third party verifies with the published key (ADR-000019).
+message SignedCheckpoint {
+  int64 through_seq = 1;
+  int64 tree_size = 2;
+  string root_hash = 3; // lowercase hex
+  string alg_version = 4;
+  string signer_key_id = 5;
+  string recorded_at = 6; // RFC3339 UTC
+  bytes signed_note = 7; // the signed note (C2SP signed-note encoding)
 }

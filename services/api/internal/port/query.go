@@ -202,6 +202,18 @@ type CheckpointView struct {
 	RecordedAt  time.Time
 }
 
+// SignedCheckpointView is one signed checkpoint for the public feed (ADR-000019),
+// including the full C2SP signed-note bytes that a third party verifies.
+type SignedCheckpointView struct {
+	ThroughSeq  int64
+	TreeSize    int64
+	RootHash    string // lowercase hex
+	AlgVersion  string
+	SignerKeyID string
+	RecordedAt  time.Time
+	SignedNote  []byte
+}
+
 // StreamVerificationView is one Stream's full export for bounded in-browser
 // verification (ADR-000014): every event's canonical facts + stored log_hash,
 // ordered by stream_seq asc, plus the covering checkpoint when one exists.
@@ -240,4 +252,7 @@ type QueryReader interface {
 	// latest checkpoint, if one exists, for the global provenance masthead
 	// (ADR-000018/000019). hasCheckpoint is false until the generator writes one.
 	MastheadStatus(ctx context.Context) (watchCount int64, latest CheckpointView, hasCheckpoint bool, err error)
+	// ListCheckpoints returns the newest signed checkpoints (through_seq desc, capped
+	// by limit) for the public passive-exposure feed (ADR-000019).
+	ListCheckpoints(ctx context.Context, limit int) ([]SignedCheckpointView, error)
 }

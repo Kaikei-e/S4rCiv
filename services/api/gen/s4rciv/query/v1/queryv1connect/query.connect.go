@@ -69,6 +69,9 @@ const (
 	// QueryServiceGetMastheadStatusProcedure is the fully-qualified name of the QueryService's
 	// GetMastheadStatus RPC.
 	QueryServiceGetMastheadStatusProcedure = "/s4rciv.query.v1.QueryService/GetMastheadStatus"
+	// QueryServiceListCheckpointsProcedure is the fully-qualified name of the QueryService's
+	// ListCheckpoints RPC.
+	QueryServiceListCheckpointsProcedure = "/s4rciv.query.v1.QueryService/ListCheckpoints"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -87,6 +90,7 @@ var (
 	queryServiceListLegislatorVotesMethodDescriptor   = queryServiceServiceDescriptor.Methods().ByName("ListLegislatorVotes")
 	queryServiceGetStreamVerificationMethodDescriptor = queryServiceServiceDescriptor.Methods().ByName("GetStreamVerification")
 	queryServiceGetMastheadStatusMethodDescriptor     = queryServiceServiceDescriptor.Methods().ByName("GetMastheadStatus")
+	queryServiceListCheckpointsMethodDescriptor       = queryServiceServiceDescriptor.Methods().ByName("ListCheckpoints")
 )
 
 // QueryServiceClient is a client for the s4rciv.query.v1.QueryService service.
@@ -139,6 +143,12 @@ type QueryServiceClient interface {
 	// "verified ✓" — the checkpoint is a commitment a third party verifies, never a
 	// claim by S4rCiv about itself (ADR-000014 / 設計原則①).
 	GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error)
+	// ── Signed checkpoint feed for passive witnessing (ADR-000019) ───────────────
+	// The signed checkpoints, newest first, as full C2SP signed-note bytes. Exposed
+	// publicly (read-only) so third-party witnesses and archivers PULL them; S4rCiv
+	// never pushes (設計原則①). The bytes are the canonical artifact a third party
+	// verifies with the published key — not a self-graded "verified" flag.
+	ListCheckpoints(context.Context, *connect.Request[v1.ListCheckpointsRequest]) (*connect.Response[v1.ListCheckpointsResponse], error)
 }
 
 // NewQueryServiceClient constructs a client for the s4rciv.query.v1.QueryService service. By
@@ -229,6 +239,12 @@ func NewQueryServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(queryServiceGetMastheadStatusMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listCheckpoints: connect.NewClient[v1.ListCheckpointsRequest, v1.ListCheckpointsResponse](
+			httpClient,
+			baseURL+QueryServiceListCheckpointsProcedure,
+			connect.WithSchema(queryServiceListCheckpointsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -247,6 +263,7 @@ type queryServiceClient struct {
 	listLegislatorVotes   *connect.Client[v1.ListLegislatorVotesRequest, v1.ListLegislatorVotesResponse]
 	getStreamVerification *connect.Client[v1.GetStreamVerificationRequest, v1.GetStreamVerificationResponse]
 	getMastheadStatus     *connect.Client[v1.GetMastheadStatusRequest, v1.GetMastheadStatusResponse]
+	listCheckpoints       *connect.Client[v1.ListCheckpointsRequest, v1.ListCheckpointsResponse]
 }
 
 // GetMeeting calls s4rciv.query.v1.QueryService.GetMeeting.
@@ -314,6 +331,11 @@ func (c *queryServiceClient) GetMastheadStatus(ctx context.Context, req *connect
 	return c.getMastheadStatus.CallUnary(ctx, req)
 }
 
+// ListCheckpoints calls s4rciv.query.v1.QueryService.ListCheckpoints.
+func (c *queryServiceClient) ListCheckpoints(ctx context.Context, req *connect.Request[v1.ListCheckpointsRequest]) (*connect.Response[v1.ListCheckpointsResponse], error) {
+	return c.listCheckpoints.CallUnary(ctx, req)
+}
+
 // QueryServiceHandler is an implementation of the s4rciv.query.v1.QueryService service.
 type QueryServiceHandler interface {
 	GetMeeting(context.Context, *connect.Request[v1.GetMeetingRequest]) (*connect.Response[v1.GetMeetingResponse], error)
@@ -364,6 +386,12 @@ type QueryServiceHandler interface {
 	// "verified ✓" — the checkpoint is a commitment a third party verifies, never a
 	// claim by S4rCiv about itself (ADR-000014 / 設計原則①).
 	GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error)
+	// ── Signed checkpoint feed for passive witnessing (ADR-000019) ───────────────
+	// The signed checkpoints, newest first, as full C2SP signed-note bytes. Exposed
+	// publicly (read-only) so third-party witnesses and archivers PULL them; S4rCiv
+	// never pushes (設計原則①). The bytes are the canonical artifact a third party
+	// verifies with the published key — not a self-graded "verified" flag.
+	ListCheckpoints(context.Context, *connect.Request[v1.ListCheckpointsRequest]) (*connect.Response[v1.ListCheckpointsResponse], error)
 }
 
 // NewQueryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -450,6 +478,12 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(queryServiceGetMastheadStatusMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	queryServiceListCheckpointsHandler := connect.NewUnaryHandler(
+		QueryServiceListCheckpointsProcedure,
+		svc.ListCheckpoints,
+		connect.WithSchema(queryServiceListCheckpointsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/s4rciv.query.v1.QueryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case QueryServiceGetMeetingProcedure:
@@ -478,6 +512,8 @@ func NewQueryServiceHandler(svc QueryServiceHandler, opts ...connect.HandlerOpti
 			queryServiceGetStreamVerificationHandler.ServeHTTP(w, r)
 		case QueryServiceGetMastheadStatusProcedure:
 			queryServiceGetMastheadStatusHandler.ServeHTTP(w, r)
+		case QueryServiceListCheckpointsProcedure:
+			queryServiceListCheckpointsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -537,4 +573,8 @@ func (UnimplementedQueryServiceHandler) GetStreamVerification(context.Context, *
 
 func (UnimplementedQueryServiceHandler) GetMastheadStatus(context.Context, *connect.Request[v1.GetMastheadStatusRequest]) (*connect.Response[v1.GetMastheadStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.GetMastheadStatus is not implemented"))
+}
+
+func (UnimplementedQueryServiceHandler) ListCheckpoints(context.Context, *connect.Request[v1.ListCheckpointsRequest]) (*connect.Response[v1.ListCheckpointsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("s4rciv.query.v1.QueryService.ListCheckpoints is not implemented"))
 }

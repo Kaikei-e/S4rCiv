@@ -171,4 +171,19 @@ func TestMastheadStatus_CountsEnabledWatches_AndLatestCheckpoint(t *testing.T) {
 	if cp.ThroughSeq != 2 || !cp.Signed || cp.SignerKeyID != "s4rciv-itest" {
 		t.Fatalf("latest checkpoint = %+v, want through_seq 2, signed, key s4rciv-itest", cp)
 	}
+
+	// The public feed returns the signed notes, newest first.
+	feed, err := qr.ListCheckpoints(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(feed) != 2 || feed[0].ThroughSeq != 2 || feed[1].ThroughSeq != 1 {
+		t.Fatalf("feed = %+v, want through_seq [2, 1] (newest first)", feed)
+	}
+	if string(feed[0].SignedNote) != "signed-note" || feed[0].SignerKeyID != "s4rciv-itest" {
+		t.Fatalf("feed[0] must carry the stored signed note + key: %+v", feed[0])
+	}
+	if feed[0].RootHash == "" || len(feed[0].RootHash) != 64 {
+		t.Fatalf("feed[0].RootHash should be 64 hex chars, got %q", feed[0].RootHash)
+	}
 }

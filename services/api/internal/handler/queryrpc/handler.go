@@ -574,6 +574,26 @@ func (h *Handler) GetMastheadStatus(ctx context.Context, _ *connect.Request[quer
 	return connect.NewResponse(out), nil
 }
 
+func (h *Handler) ListCheckpoints(ctx context.Context, req *connect.Request[queryv1.ListCheckpointsRequest]) (*connect.Response[queryv1.ListCheckpointsResponse], error) {
+	views, err := h.reader.ListCheckpoints(ctx, int(req.Msg.GetLimit()))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &queryv1.ListCheckpointsResponse{}
+	for _, v := range views {
+		out.Checkpoints = append(out.Checkpoints, &queryv1.SignedCheckpoint{
+			ThroughSeq:  v.ThroughSeq,
+			TreeSize:    v.TreeSize,
+			RootHash:    v.RootHash,
+			AlgVersion:  v.AlgVersion,
+			SignerKeyId: v.SignerKeyID,
+			RecordedAt:  v.RecordedAt.UTC().Format(time.RFC3339),
+			SignedNote:  v.SignedNote,
+		})
+	}
+	return connect.NewResponse(out), nil
+}
+
 func toAttribution(a port.Attribution) *queryv1.Attribution {
 	return &queryv1.Attribution{
 		Source:         a.Source,

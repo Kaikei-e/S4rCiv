@@ -25,6 +25,9 @@ func (f fakeVerifReader) StreamVerification(context.Context, string) (port.Strea
 func (fakeVerifReader) MastheadStatus(context.Context) (int64, port.CheckpointView, bool, error) {
 	return 0, port.CheckpointView{}, false, nil
 }
+func (fakeVerifReader) ListCheckpoints(context.Context, int) ([]port.SignedCheckpointView, error) {
+	return nil, nil
+}
 func (fakeVerifReader) Meeting(context.Context, string) (port.MeetingView, []port.SpeechView, bool, error) {
 	return port.MeetingView{}, nil, false, nil
 }
