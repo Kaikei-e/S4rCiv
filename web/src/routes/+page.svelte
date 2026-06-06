@@ -33,6 +33,11 @@
 		[data.filters.source, data.filters.eventType, data.filters.classification, data.filters.keyword]
 			.filter(Boolean).length
 	);
+
+	// Narrow-only disclosure state. <details> can't be force-opened on wide via CSS
+	// (new browsers hide its content with content-visibility, not display:none), so
+	// the toggle is explicit: collapsed by default on narrow, always shown on wide.
+	let filtersOpen = $state(false);
 </script>
 
 <svelte:head>
@@ -56,14 +61,20 @@
 </header>
 
 <main id="main" class="wrap">
-	<details class="filterbox">
-		<summary>
+	<div class="filterbox">
+		<button
+			type="button"
+			class="filtertoggle"
+			aria-expanded={filtersOpen}
+			aria-controls="filterform"
+			onclick={() => (filtersOpen = !filtersOpen)}
+		>
 			<span class="label">絞り込み</span>
 			{#if activeFilterCount > 0}
 				<span class="active mono">適用中 {activeFilterCount}</span>
 			{/if}
-		</summary>
-		<form class="filters" method="GET" action="/">
+		</button>
+		<form id="filterform" class="filters" class:open={filtersOpen} method="GET" action="/">
 		<label>
 			<span class="label">ソース</span>
 			<select name="source" value={data.filters.source}>
@@ -96,7 +107,7 @@
 		</label>
 		<button type="submit">絞り込む</button>
 		</form>
-	</details>
+	</div>
 
 	<section class="panel" aria-label="横断タイムライン">
 		<div class="panel-head">
@@ -196,41 +207,46 @@
 	.filterbox {
 		margin-bottom: 20px;
 	}
-	.filterbox > summary {
+	.filtertoggle {
 		display: flex;
 		align-items: center;
 		gap: 10px;
+		width: 100%;
 		cursor: pointer;
 		padding: 8px 0;
-		list-style: none;
-	}
-	.filterbox > summary::-webkit-details-marker {
-		display: none;
-	}
-	.filterbox > summary::before {
-		content: '▸';
+		background: none;
+		border: none;
+		border-radius: 0;
 		color: var(--text-3);
+		text-align: left;
 	}
-	.filterbox[open] > summary::before {
+	.filtertoggle::before {
+		content: '▸';
+	}
+	.filtertoggle[aria-expanded='true']::before {
 		content: '▾';
 	}
 	.filterbox .active {
 		font-size: 12px;
 		color: var(--st-changed-t);
 	}
+	/* Collapsed by default (narrow); opened via the toggle. */
 	.filters {
-		display: flex;
+		display: none;
 		flex-wrap: wrap;
 		align-items: end;
 		gap: 12px;
 	}
-	/* Wide: no disclosure — filters are always visible inline. (mirrors --bp-lg 55rem) */
+	.filters.open {
+		display: flex;
+	}
+	/* Wide: no disclosure — hide the toggle, always show the filters (--bp-lg 55rem). */
 	@media (min-width: 55rem) {
-		.filterbox > summary {
+		.filtertoggle {
 			display: none;
 		}
-		.filterbox > .filters {
-			display: flex !important;
+		.filters {
+			display: flex;
 		}
 	}
 	/* Narrow: stack each control full-width. (mirrors --bp-sm 30rem) */
@@ -360,9 +376,6 @@
 			min-height: 44px;
 			display: inline-flex;
 			align-items: center;
-		}
-		.filterbox > summary {
-			min-height: 44px;
 		}
 	}
 </style>

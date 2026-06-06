@@ -35,7 +35,7 @@ test.describe('レスポンシブ (ADR-000017)', () => {
 		// Closed by default → the controls are hidden until the citizen opens them.
 		const source = page.locator('select[name="source"]');
 		await expect(source).toBeHidden();
-		await page.locator('details > summary').click();
+		await page.getByRole('button', { name: /絞り込み/ }).click();
 		await expect(source).toBeVisible();
 	});
 
