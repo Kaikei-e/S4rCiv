@@ -2,7 +2,7 @@ name: s4rciv
 
 services:
   db:
-    image: postgres:18.4-trixie
+    image: postgres:18.4-trixie@sha256:8ff36f3c66371cba71d20ceedccfc3de9669a68737607888c4ef0af93abe8e39
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: arigaio/atlas:1.2.1-alpine
+    image: arigaio/atlas:1.2.1-alpine@sha256:2cbaaa3c0415d2fbb21399bad15329bb5f60db2f9d04f265aec51abfdfcf8748
     depends_on:
       db:
         condition: service_healthy

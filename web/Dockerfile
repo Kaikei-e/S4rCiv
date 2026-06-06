@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:24-trixie-slim AS build
+FROM node:24-trixie-slim@sha256:05c08ce4291e9a58f59456a7985176defb12cdd42271f35ff81a3e167ea61d4c AS build
 RUN corepack enable
 WORKDIR /app
 # pnpm-workspace.yaml carries the esbuild build-script allowlist (pnpm 11); it must
@@ -16,7 +16,7 @@ CMD ["pnpm", "test"]
 
 # adapter-node bundles a self-contained server into build/, so the runtime
 # image needs no node_modules.
-FROM node:24-trixie-slim AS runtime
+FROM node:24-trixie-slim@sha256:05c08ce4291e9a58f59456a7985176defb12cdd42271f35ff81a3e167ea61d4c AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build
