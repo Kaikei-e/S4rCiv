@@ -8,7 +8,7 @@
 	const OPT: Record<string, string> = { yes: '賛成', no: '反対', abstain: '棄権' };
 </script>
 
-<svelte:head><title>{data.personName || data.personId} の記名投票 — S4rCiv</title></svelte:head>
+<svelte:head><title>{data.personName || data.personId} の記名投票 — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>

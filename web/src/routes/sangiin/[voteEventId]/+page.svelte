@@ -22,7 +22,7 @@
 	const prCount = $derived((m.prVotes ?? []).length);
 </script>
 
-<svelte:head><title>{m.motion || m.voteEventId} — 参議院記名投票地図 — S4rCiv</title></svelte:head>
+<svelte:head><title>{m.motion || m.voteEventId} — 参議院記名投票地図 — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/sangiin">← 参議院 記名投票一覧</a>

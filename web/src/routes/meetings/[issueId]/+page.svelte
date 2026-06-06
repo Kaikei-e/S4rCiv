@@ -16,7 +16,7 @@
 	);
 </script>
 
-<svelte:head><title>{m.meetingName ?? m.issueId} — S4rCiv</title></svelte:head>
+<svelte:head><title>{m.meetingName ?? m.issueId} — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>

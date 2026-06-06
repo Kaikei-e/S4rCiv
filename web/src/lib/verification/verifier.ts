@@ -3,7 +3,7 @@
 // It recomputes, on the READER'S OWN machine, the canonical log hash of every
 // event from its HashableEvent fields and compares it to the stored hash, then
 // checks the per-stream content chain. This is deliberately NOT a trust badge
-// from S4rCiv: §5's adversary distrusts S4rCiv, so the value is that the reader
+// from S4RCIV: §5's adversary distrusts S4RCIV, so the value is that the reader
 // reproduces the numbers themselves rather than taking a server ✓ on faith.
 //
 // Byte-identity with the Go collector's

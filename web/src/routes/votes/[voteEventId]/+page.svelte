@@ -30,7 +30,7 @@
 	const prCount = $derived(votes.filter((v) => v.isPr).length);
 </script>
 
-<svelte:head><title>{ev.motion || ev.voteEventId} — 選挙区投票地図 — S4rCiv</title></svelte:head>
+<svelte:head><title>{ev.motion || ev.voteEventId} — 選挙区投票地図 — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/votes">← 記名投票一覧</a>

@@ -11,7 +11,7 @@
 	};
 </script>
 
-<svelte:head><title>選挙区投票地図 — S4rCiv</title></svelte:head>
+<svelte:head><title>選挙区投票地図 — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>

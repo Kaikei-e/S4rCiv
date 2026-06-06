@@ -24,7 +24,7 @@
 	const repealed = $derived(law.repealStatus && law.repealStatus !== 'None');
 </script>
 
-<svelte:head><title>{law.lawTitle ?? law.lawId} — S4rCiv</title></svelte:head>
+<svelte:head><title>{law.lawTitle ?? law.lawId} — S4RCIV</title></svelte:head>
 
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>
