@@ -5,8 +5,11 @@ import ProvenanceChip from './ProvenanceChip.svelte';
 // ProvenanceChip carries the source attribution every record must show
 // (DISCIPLINE §7/§9: 出典 permalink + 取得時刻) and, per ADR-000014, is provenance
 // ONLY — the truncated hash and the "(未検証)" wording were removed because integrity
-// is a per-chain/checkpoint property, not a per-record badge. These tests pin that
-// contract so a regression that re-introduces a per-record verdict fails loudly.
+// is a per-chain/checkpoint property, not a per-record badge. Per ADR-000021 the record
+// number (記録 #seq) is rendered ONLY when a verifyHref is given (i.e. on the 事案 detail
+// pages, as a deep-link into the verification panel): a raw global seq is an internal
+// identifier and is never surfaced as a non-clickable primary label on the timeline.
+// These tests pin that contract so a regression fails loudly.
 
 const attr = {
 	source: 'kokkai',
@@ -30,10 +33,11 @@ describe('ProvenanceChip', () => {
 		expect(screen.getByText(/最終取得 2026-01-02 12:04 JST/)).toBeInTheDocument();
 	});
 
-	it('shows 記録 #seq as a plain citation handle when no verify link is given', () => {
+	it('omits 記録 #seq when no verify link is given (timeline rows) — ADR-000021', () => {
 		render(ProvenanceChip, { props: { attr } });
-		expect(screen.getByText(/記録 #42/)).toBeInTheDocument();
-		expect(screen.queryByRole('link', { name: /記録 #42/ })).toBeNull();
+		// A raw global seq is an internal identifier; without a verification deep-link it
+		// is not surfaced at all (no non-clickable "記録 #42" on the timeline).
+		expect(screen.queryByText(/記録 #/)).toBeNull();
 	});
 
 	it('deep-links 記録 #seq into the verification panel when verifyHref is set', () => {

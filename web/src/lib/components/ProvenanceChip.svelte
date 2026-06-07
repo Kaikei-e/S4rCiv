@@ -5,11 +5,15 @@
 	interface Props {
 		attr?: Attribution;
 		// Deep-link to the per-case verification panel, anchored at this record
-		// (#verify-<seq>). When set, 記録#seq becomes a link into the panel; otherwise
-		// it is a plain citation handle. ADR-000014 §2: the chip is provenance ONLY —
-		// the truncated hash and the "(未検証)" wording moved to the panel, because
-		// integrity is a per-chain/checkpoint property, not a per-record badge. #seq is
-		// a stable citation handle into the panel, never a per-record verdict.
+		// (#verify-<seq>). 記録 #seq is rendered ONLY when this is set — i.e. on the
+		// 事案 (detail) pages where the verification panel exists; there it is both a
+		// deep-link into the panel and a stable citation handle. The cross-source
+		// timeline does NOT pass verifyHref, so its rows carry no record number: a raw
+		// global seq is an internal identifier and surfacing it as a primary label
+		// (non-clickable, meaningless) violates ADR-000014 §3 / DESIGN_LANGUAGE §10.3
+		// (ADR-000021). ADR-000014 §2: the chip is provenance ONLY — the truncated hash
+		// and the "(未検証)" wording live in the panel, because integrity is a
+		// per-chain/checkpoint property, not a per-record badge.
 		verifyHref?: string;
 	}
 	const { attr, verifyHref }: Props = $props();
@@ -31,15 +35,11 @@
 	{/if}
 	<span class="sep" aria-hidden="true">·</span>
 	<span class="mono fetched">最終取得 {fetchedLabel}</span>
-	{#if seq !== undefined}
+	{#if seq !== undefined && verifyHref}
 		<span class="sep" aria-hidden="true">·</span>
-		{#if verifyHref}
-			<a class="rec" href={verifyHref} title="この記録が記録どおりか、お使いの端末で確かめられます"
-				>記録 #{seq} ↗</a
-			>
-		{:else}
-			<span class="rec mono" title="この記録の通し番号">記録 #{seq}</span>
-		{/if}
+		<a class="rec" href={verifyHref} title="この記録が記録どおりか、お使いの端末で確かめられます"
+			>記録 #{seq} ↗</a
+		>
 	{/if}
 </div>
 

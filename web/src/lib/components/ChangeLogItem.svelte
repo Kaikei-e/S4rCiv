@@ -21,6 +21,16 @@
 		item.lawId ? `/laws/${item.lawId}` : item.issueId ? `/meetings/${item.issueId}` : undefined
 	);
 
+	// Title fallback (ADR-000022): when the interpretation read model has not produced
+	// a human title for this event yet (cold start / projection lag), never surface the
+	// raw stream id (egov-law:325M…) as a label — it is an internal identifier. Degrade
+	// honestly to a typed "（名称未取得）" so the row still says WHAT KIND of record it is
+	// (DESIGN_LANGUAGE §10). Vanished rows keep their last-known title, so this is a rare
+	// safety net, not the steady state.
+	const SOURCE_LABEL: Record<string, string> = { 'egov-law': '法令', kokkai: '会議録' };
+	const fallbackTitle = $derived(`${SOURCE_LABEL[item.source ?? ''] ?? '記録'}（名称未取得）`);
+	const displayTitle = $derived(item.title || fallbackTitle);
+
 	// observedAt is RFC3339 UTC; show it in JST (ADR-000018). The <time datetime> below
 	// keeps the raw UTC ISO for machines; the visible text is the JST-converted value.
 	const observedDay = $derived(toJstMinute(item.observedAt));
@@ -41,9 +51,9 @@
 		<div class="headline">
 			<span class="label state" style="color: {status.text}">{status.label}</span>
 			{#if detailHref}
-				<a class="title" href={detailHref}>{item.title || item.streamId}</a>
+				<a class="title" href={detailHref}>{displayTitle}</a>
 			{:else}
-				<span class="title">{item.title || item.streamId}</span>
+				<span class="title">{displayTitle}</span>
 			{/if}
 		</div>
 
