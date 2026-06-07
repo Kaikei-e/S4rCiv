@@ -52,22 +52,18 @@ func (s *ReadModel) SetOffset(ctx context.Context, projector string, seq int64) 
 	return err
 }
 
+// BeginRebuild marks the projector rebuilding and resets its offset to 0 so Run
+// replays from genesis. It does NOT truncate the read model (ADR-000022): every apply
+// is a merge-safe upsert / per-stream replace and the observation log is append-only,
+// so replaying overwrites each stream's rows in place and readers never see an empty
+// read model mid-rebuild. Use Truncate explicitly for a full wipe (e.g. when projector
+// logic stops emitting some stream and the stale rows must be swept).
 func (s *ReadModel) BeginRebuild(ctx context.Context, projector string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, truncateReadModels); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO interpretation.projector_offset (projector, last_seq, rebuilding)
 		VALUES ($1, 0, true)
-		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector)
+	return err
 }
 
 // ── ReadModelStore ──────────────────────────────────────────────────────────

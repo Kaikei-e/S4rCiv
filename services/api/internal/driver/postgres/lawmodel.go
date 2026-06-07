@@ -49,22 +49,18 @@ func (s *LawReadModel) SetOffset(ctx context.Context, projector string, seq int6
 	return err
 }
 
+// BeginRebuild marks the projector rebuilding and resets its offset to 0 so Run
+// replays from genesis. It does NOT truncate the read model (ADR-000022): ApplyLaw is
+// a per-law upsert + law_node replace and the observation log is append-only, so a
+// replay overwrites each law's rows in place — readers never see an empty
+// legislative_work mid-rebuild (which is what surfaced raw egov-law:<id> stream ids as
+// timeline titles). Use TruncateLaws explicitly for a full wipe.
 func (s *LawReadModel) BeginRebuild(ctx context.Context, projector string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, truncateLawReadModels); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO interpretation.projector_offset (projector, last_seq, rebuilding)
 		VALUES ($1, 0, true)
-		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector)
+	return err
 }
 
 // ── LawReadModelStore ───────────────────────────────────────────────────────

@@ -51,6 +51,14 @@ func (s *ChangeReadModel) SetOffset(ctx context.Context, projector string, seq i
 	return err
 }
 
+// BeginRebuild deletes this projector's egov change rows, then resets the offset so Run
+// re-diffs from genesis. Unlike the other read models (ADR-000022), ApplyChange is a
+// bare INSERT and interpretation.change has no UNIQUE on observation_seq (PK is a
+// synthetic bigserial), so a replay without this delete would accumulate duplicate
+// change rows and double-count diffs in the timeline. Making this projector reader-atomic
+// too is a follow-up (add UNIQUE(observation_seq) + upsert ApplyChange); its rebuild
+// window only blanks diff counts / classification on rows that already have a title, not
+// the title itself.
 func (s *ChangeReadModel) BeginRebuild(ctx context.Context, projector string) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

@@ -15,10 +15,13 @@ import (
 )
 
 // Reproject-safety is the core immutable-design-guard invariant for disposable
-// read models (ADR-000002): a read model can be TRUNCATEd and replayed from the
-// observation log to a byte-identical result. This drives the REAL kokkai
-// Projector against a real Postgres — Run → fingerprint A → Reproject (truncate +
-// reset offset + replay) → fingerprint B → assert A == B and no duplication.
+// read models (ADR-000002): a read model can be replayed from the observation log to
+// a byte-identical result. Since ADR-000022 the kokkai Reproject does NOT truncate —
+// it resets the offset and replays merge-safe upserts / per-stream replaces over the
+// live rows, so readers never see an empty read model mid-rebuild. This test is what
+// guards that the no-truncate replay stays idempotent: Run → fingerprint A → Reproject
+// (reset offset + replay, no truncate) → fingerprint B → assert A == B and no
+// duplication (a non-idempotent apply would double the counts here).
 
 // A minimal but valid kokkai meeting snapshot (the bytes ParseMeeting consumes).
 // Fictional names only — never real Diet members.
@@ -87,8 +90,8 @@ func TestProjector_ReprojectIsByteStable(t *testing.T) {
 		t.Errorf("offset = %d after Run, want event seq %d", off, evSeq)
 	}
 
-	// Reproject: BeginRebuild truncates the read models + resets the offset, then
-	// replays from 0.
+	// Reproject: BeginRebuild resets the offset (no truncate, ADR-000022), then
+	// replays from 0, overwriting the live rows in place.
 	n2, err := projector.Reproject(ctx)
 	if err != nil {
 		t.Fatalf("Reproject: %v", err)
@@ -99,7 +102,8 @@ func TestProjector_ReprojectIsByteStable(t *testing.T) {
 	fpB := fingerprint(t, pool, issueID)
 
 	// The disposable projection rebuilt to a byte-identical state — and did not
-	// duplicate rows (truncate worked; a missing truncate would double the counts).
+	// duplicate rows: the no-truncate replay is idempotent (upsert meeting + per-issue
+	// replace speeches); a non-idempotent apply would double the counts here.
 	if fpA != fpB {
 		t.Errorf("reproject not stable:\n  before %+v\n  after  %+v", fpA, fpB)
 	}

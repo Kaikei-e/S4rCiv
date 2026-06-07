@@ -115,8 +115,13 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 			v.Title = lawTitle
 			v.Subtitle = lawNum
 			permalink, wasOCR = lwPermalink, lwWasOCR
-		default: // event with no enriching read model (e.g. vanished + pruned); fall back to stream id
-			v.Title = v.StreamID
+		default: // event whose interpretation read model has not been projected yet
+			// (cold start / projection lag). Do NOT leak the raw stream id as a title —
+			// it is an internal identifier. Leave the title empty so the web degrades to a
+			// typed "（名称未取得）" fallback from the source (ADR-000022). Vanished rows keep
+			// their last-known title (the projector skips snapshotless events), so this is
+			// a rare safety net, not the steady state.
+			v.Title = ""
 		}
 		v.WasOCR = wasOCR
 		v.Attr = port.Attribution{

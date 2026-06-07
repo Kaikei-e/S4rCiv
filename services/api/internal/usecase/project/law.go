@@ -62,7 +62,10 @@ func (p *LawProjector) Run(ctx context.Context) (int, error) {
 	}
 }
 
-// Reproject truncates the law read models, resets the offset, and replays from 0.
+// Reproject resets the offset and replays from 0 over the live law read models without
+// truncating them (ADR-000022): ApplyLaw is a per-law upsert + law_node replace, so a
+// replay overwrites each law in place and readers never see an empty legislative_work
+// (which had surfaced raw egov-law:<id> stream ids as timeline titles mid-rebuild).
 func (p *LawProjector) Reproject(ctx context.Context) (int, error) {
 	if err := p.offsets.BeginRebuild(ctx, p.name); err != nil {
 		return 0, fmt.Errorf("begin rebuild: %w", err)

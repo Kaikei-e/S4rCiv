@@ -25,12 +25,6 @@ func NewRosterReadModel(pool *pgxpool.Pool, streamPrefix string) *RosterReadMode
 	return &RosterReadModel{pool: pool, streamPrefix: streamPrefix}
 }
 
-func (s *RosterReadModel) deleteOwnRows(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx,
-		`DELETE FROM interpretation.legislator_district WHERE stream_id LIKE $1`, s.streamPrefix+"%")
-	return err
-}
-
 // ── ProjectorOffset ─────────────────────────────────────────────────────────
 
 func (s *RosterReadModel) Offset(ctx context.Context, projector string) (int64, error) {
@@ -56,22 +50,17 @@ func (s *RosterReadModel) SetOffset(ctx context.Context, projector string, seq i
 	return err
 }
 
+// BeginRebuild marks the projector rebuilding and resets its offset to 0 so Run
+// replays from genesis. It does NOT delete this source's rows (ADR-000022): ApplyRoster
+// replaces each page's rows by stream_id + upserts on person_id, and the observation log
+// is append-only, so a replay overwrites each page in place — readers never see an empty
+// legislator_district mid-rebuild. Use TruncateRoster explicitly for a full wipe.
 func (s *RosterReadModel) BeginRebuild(ctx context.Context, projector string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if err := s.deleteOwnRows(ctx, tx); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO interpretation.projector_offset (projector, last_seq, rebuilding)
 		VALUES ($1, 0, true)
-		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector)
+	return err
 }
 
 // ── RosterReadModelStore ────────────────────────────────────────────────────

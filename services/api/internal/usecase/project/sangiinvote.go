@@ -61,7 +61,9 @@ func (p *SangiinVoteProjector) Run(ctx context.Context) (int, error) {
 	}
 }
 
-// Reproject truncates the read model, resets the offset, and replays from 0.
+// Reproject resets the offset and replays from 0 over the live read model without
+// truncating it (ADR-000022): ApplySangiinVote upserts each event on vote_event_id +
+// replaces its votes, so a replay overwrites in place and readers never see empty rows.
 func (p *SangiinVoteProjector) Reproject(ctx context.Context) (int, error) {
 	if err := p.offsets.BeginRebuild(ctx, p.name); err != nil {
 		return 0, fmt.Errorf("begin rebuild: %w", err)

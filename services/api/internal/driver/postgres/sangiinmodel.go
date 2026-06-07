@@ -49,22 +49,18 @@ func (s *SangiinVoteReadModel) SetOffset(ctx context.Context, projector string, 
 	return err
 }
 
+// BeginRebuild marks the projector rebuilding and resets its offset to 0 so Run
+// replays from genesis. It does NOT truncate the read model (ADR-000022):
+// ApplySangiinVote upserts each vote event on vote_event_id + replaces its votes, and
+// the observation log is append-only, so a replay overwrites each event in place —
+// readers never see empty sangiin_vote(_event) mid-rebuild. Use TruncateSangiinVote
+// explicitly for a full wipe.
 func (s *SangiinVoteReadModel) BeginRebuild(ctx context.Context, projector string) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-	if _, err := tx.Exec(ctx, truncateSangiinVote); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `
+	_, err := s.pool.Exec(ctx, `
 		INSERT INTO interpretation.projector_offset (projector, last_seq, rebuilding)
 		VALUES ($1, 0, true)
-		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+		ON CONFLICT (projector) DO UPDATE SET last_seq = 0, rebuilding = true`, projector)
+	return err
 }
 
 // ── SangiinVoteReadModelStore ───────────────────────────────────────────────

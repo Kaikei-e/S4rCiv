@@ -66,7 +66,9 @@ func (p *Projector) Run(ctx context.Context) (int, error) {
 	}
 }
 
-// Reproject truncates the read models, resets the offset, and replays from 0.
+// Reproject resets the offset and replays from 0 over the live read models without
+// truncating them (ADR-000022): each apply is a merge-safe upsert / per-stream replace,
+// so readers never see an empty read model mid-rebuild.
 func (p *Projector) Reproject(ctx context.Context) (int, error) {
 	if err := p.offsets.BeginRebuild(ctx, p.name); err != nil {
 		return 0, fmt.Errorf("begin rebuild: %w", err)
