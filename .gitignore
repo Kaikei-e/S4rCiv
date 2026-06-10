@@ -6,6 +6,9 @@
 #compose
 compose.tunnel.yaml
 
+# 内部作業ノート
+/docs/refine/
+
 # Go build artifacts
 /services/api/api
 
