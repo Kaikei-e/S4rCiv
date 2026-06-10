@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Attribution } from '$lib/types';
 	import { toJstMinute } from '$lib/time';
+	import { safeSourceUrl } from '$lib/safeSourceUrl';
 
 	interface Props {
 		attr?: Attribution;
@@ -23,12 +24,15 @@
 	// Compose the whole label in the script so it stays a single text node.
 	const fetchedJst = $derived(toJstMinute(attr?.fetchedAt));
 	const fetchedLabel = $derived(fetchedJst ? `${fetchedJst} JST` : '—');
+	// Link the 出典 only when the stored permalink passes the primary-source
+	// allowlist (F-05); otherwise fall back to the plain-text 出典 label.
+	const srcHref = $derived(attr?.permalink ? safeSourceUrl(attr.permalink) : null);
 </script>
 
 <div class="prov">
-	{#if attr?.permalink}
-		<a class="src" href={attr.permalink} target="_blank" rel="noopener noreferrer external"
-			>出典 {attr.source ?? ''} ↗</a
+	{#if srcHref}
+		<a class="src" href={srcHref} target="_blank" rel="noopener noreferrer external"
+			>出典 {attr?.source ?? ''} ↗</a
 		>
 	{:else}
 		<span class="src">出典 {attr?.source ?? '—'}</span>

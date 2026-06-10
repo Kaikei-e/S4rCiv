@@ -58,4 +58,13 @@ describe('ProvenanceChip', () => {
 		expect(screen.queryByRole('link')).toBeNull();
 		expect(screen.getByText(/出典 —/)).toBeInTheDocument();
 	});
+
+	it('falls back to a non-linked 出典 when the permalink fails the source allowlist (F-05)', () => {
+		render(ProvenanceChip, {
+			props: { attr: { ...attr, permalink: 'javascript:alert(1)' } }
+		});
+		// The label is still shown, but never as a hyperlink to a non-primary-source URL.
+		expect(screen.queryByRole('link')).toBeNull();
+		expect(screen.getByText(/出典 kokkai/)).toBeInTheDocument();
+	});
 });

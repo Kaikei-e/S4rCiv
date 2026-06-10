@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
 	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
+	import { safeSourceUrl } from '$lib/safeSourceUrl';
 
 	let { data }: { data: PageData } = $props();
 	const m = $derived(data.meeting);
@@ -13,6 +14,11 @@
 	// Deep-link the provenance chip to this record's row in the verification panel.
 	const verifyHref = $derived(
 		m.attribution?.observationSeq ? `#verify-${m.attribution.observationSeq}` : undefined
+	);
+	// Link to the original text only when the stored permalink passes the
+	// primary-source allowlist (F-05); otherwise the label is shown as plain text.
+	const extHref = $derived(
+		m.attribution?.permalink ? safeSourceUrl(m.attribution.permalink) : null
 	);
 </script>
 
@@ -51,10 +57,12 @@
 		{/each}
 	</section>
 
-	{#if m.attribution?.permalink}
-		<a class="ext" href={m.attribution.permalink} target="_blank" rel="noopener noreferrer external"
+	{#if extHref}
+		<a class="ext" href={extHref} target="_blank" rel="noopener noreferrer external"
 			>NDL 国会会議録検索システムで原文を見る ↗</a
 		>
+	{:else if m.attribution?.permalink}
+		<span class="ext">NDL 国会会議録検索システムで原文を見る</span>
 	{/if}
 
 	{#if data.verification}

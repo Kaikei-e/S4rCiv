@@ -16,7 +16,9 @@
 		</p>
 	</header>
 
-	{#if events.length === 0}
+	{#if data.error}
+		<p class="empty error">⊘ 取得に失敗しました: <span class="mono">{data.error}</span></p>
+	{:else if events.length === 0}
 		<p class="empty">記名投票がまだありません。</p>
 	{:else}
 		<ul class="list">
@@ -66,6 +68,9 @@
 	.empty {
 		color: var(--text-3);
 		font-size: 14px;
+	}
+	.empty.error {
+		color: var(--st-critical-t);
 	}
 	.list {
 		list-style: none;

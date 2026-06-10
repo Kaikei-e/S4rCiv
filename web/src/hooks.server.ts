@@ -6,11 +6,16 @@ import type { Handle } from '@sveltejs/kit';
 // confusion, X-Frame-Options backs up frame-ancestors for legacy clients, a
 // no-referrer policy avoids leaking the visited path to outbound gov permalinks
 // (matches the project's privacy stance), and COOP isolates the browsing context.
+// HSTS is also set at the edge (Cloudflare); emitting it here too keeps the
+// guarantee when the app is reached without the edge in front (defense in depth).
+// Permissions-Policy disables powerful browser features the site never uses.
 export const handle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('X-Frame-Options', 'DENY');
 	response.headers.set('Referrer-Policy', 'no-referrer');
 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+	response.headers.set('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
 	return response;
 };

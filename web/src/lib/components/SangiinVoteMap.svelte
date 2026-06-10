@@ -14,6 +14,21 @@
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let map: any;
 
+	// Popup content as DOM nodes via textContent — never an HTML string. The current
+	// inputs are static GeoJSON, but the same no-innerHTML rule as DistrictVoteMap
+	// applies so a future data source can't introduce HTML injection here.
+	function popupContent(title: string, lines: string[]): HTMLElement {
+		const root = document.createElement('div');
+		const strong = document.createElement('strong');
+		strong.textContent = title;
+		root.appendChild(strong);
+		for (const line of lines) {
+			root.appendChild(document.createElement('br'));
+			root.appendChild(document.createTextNode(line));
+		}
+		return root;
+	}
+
 	// match ['get','id'] → factual category. id is the JIS prefecture code; a 合区 tally
 	// ("31,32") is applied to both prefectures.
 	function fillColorExpr(byCode: Map<number, PrefectureTally>): unknown {
@@ -96,7 +111,7 @@
 			const body = t
 				? `賛成 ${t.yes ?? 0} ／ 反対 ${t.no ?? 0}${t.abstain ? ` ／ 棄権・欠席 ${t.abstain}` : ''}`
 				: '記録なし';
-			popup.setLngLat(e.lngLat).setHTML(`<strong>${name}</strong><br>${body}`).addTo(map);
+			popup.setLngLat(e.lngLat).setDOMContent(popupContent(name, [body])).addTo(map);
 		});
 		map.on('mouseenter', 'fill', () => (map.getCanvas().style.cursor = 'pointer'));
 		map.on('mouseleave', 'fill', () => (map.getCanvas().style.cursor = ''));

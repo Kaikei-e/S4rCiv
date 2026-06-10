@@ -35,7 +35,9 @@ const BASE = (env.API_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '');
 
 const client = createPromiseClient(
 	QueryService,
-	createConnectTransport({ baseUrl: BASE, httpVersion: '1.1' })
+	// defaultTimeoutMs: a hung upstream must fail the SSR request quickly instead of
+	// pinning a Node worker open indefinitely (request-smuggled slowloris resilience).
+	createConnectTransport({ baseUrl: BASE, httpVersion: '1.1', defaultTimeoutMs: 10_000 })
 );
 
 function json<T>(m: Message): T {

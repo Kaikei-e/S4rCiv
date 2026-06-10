@@ -17,6 +17,20 @@
 
 	const OPT_JA: Record<string, string> = { yes: '賛成', no: '反対', abstain: '棄権' };
 
+	// Popup content as DOM nodes via textContent — never an HTML string. Member /
+	// district names are upstream-derived, so they must not reach innerHTML (XSS).
+	function popupContent(title: string, lines: string[]): HTMLElement {
+		const root = document.createElement('div');
+		const strong = document.createElement('strong');
+		strong.textContent = title;
+		root.appendChild(strong);
+		for (const line of lines) {
+			root.appendChild(document.createElement('br'));
+			root.appendChild(document.createTextNode(line));
+		}
+		return root;
+	}
+
 	// A MapLibre `match` expression colouring each district by its member's option.
 	// Empty option groups are skipped (a match needs ≥1 label/output pair); when no
 	// district has a record at all, fall back to a flat "no record" colour.
@@ -105,7 +119,7 @@
 			const who = v?.voterName ? `${v.voterName}${v.parliamentaryGroup ? `（${v.parliamentaryGroup}）` : ''}` : '';
 			popup
 				.setLngLat(e.lngLat)
-				.setHTML(`<strong>${name}</strong>${who ? `<br>${who}` : ''}<br>投票: ${opt}`)
+				.setDOMContent(popupContent(name, who ? [who, `投票: ${opt}`] : [`投票: ${opt}`]))
 				.addTo(map);
 		});
 		map.on('mouseenter', 'fill', () => (map.getCanvas().style.cursor = 'pointer'));

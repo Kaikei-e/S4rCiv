@@ -3,12 +3,18 @@
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
 	import LawChangeBlock from '$lib/components/LawChangeBlock.svelte';
 	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
+	import { safeSourceUrl } from '$lib/safeSourceUrl';
 
 	let { data }: { data: PageData } = $props();
 	const law = $derived(data.law);
 	// Deep-link the provenance chip to this record's row in the verification panel.
 	const verifyHref = $derived(
 		law.attribution?.observationSeq ? `#verify-${law.attribution.observationSeq}` : undefined
+	);
+	// Link to the original text only when the stored permalink passes the
+	// primary-source allowlist (F-05); otherwise the label is shown as plain text.
+	const extHref = $derived(
+		law.attribution?.permalink ? safeSourceUrl(law.attribution.permalink) : null
 	);
 
 	// Indent depth. 号の細分 (subitem) share one flat node_type, so the イ→(1)→(ア) nesting
@@ -65,10 +71,12 @@
 				</div>
 			{/each}
 		</div>
-		{#if law.attribution?.permalink}
-			<a class="ext" href={law.attribution.permalink} target="_blank" rel="noopener noreferrer external"
+		{#if extHref}
+			<a class="ext" href={extHref} target="_blank" rel="noopener noreferrer external"
 				>e-Gov で原文を見る ↗</a
 			>
+		{:else if law.attribution?.permalink}
+			<span class="ext">e-Gov で原文を見る</span>
 		{/if}
 	</section>
 

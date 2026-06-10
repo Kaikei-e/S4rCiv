@@ -5,14 +5,19 @@ import type { TimelineItem } from '$lib/types';
 // SSR/BFF (D1): the timeline is fetched server-side from the private API. Filters
 // are read from the URL so the page works without JS (progressive enhancement)
 // and every view is a shareable, indexable URL — the "誰でも辿れる" mandate.
+// Clamp URL-supplied values before forwarding them upstream: trim and cap the
+// length so an oversized query string can't be relayed to the RPC as-is. Filter
+// values are short labels (100 is generous); page tokens are opaque cursors (64).
+const clamp = (v: string | null, max: number) => (v ?? '').trim().slice(0, max);
+
 export const load: PageServerLoad = async ({ url }) => {
 	const filters = {
-		source: url.searchParams.get('source') ?? '',
-		eventType: url.searchParams.get('event_type') ?? '',
-		classification: url.searchParams.get('classification') ?? '',
-		keyword: url.searchParams.get('q') ?? ''
+		source: clamp(url.searchParams.get('source'), 100),
+		eventType: clamp(url.searchParams.get('event_type'), 100),
+		classification: clamp(url.searchParams.get('classification'), 100),
+		keyword: clamp(url.searchParams.get('q'), 100)
 	};
-	const pageToken = url.searchParams.get('page') ?? '';
+	const pageToken = clamp(url.searchParams.get('page'), 64);
 
 	try {
 		const res = await listTimeline({ ...filters, pageToken, pageSize: 50 });
