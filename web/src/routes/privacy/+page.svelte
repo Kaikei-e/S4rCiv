@@ -88,7 +88,7 @@
 		を窓口として受け付けます（試験運用中の暫定的な窓口です）。
 	</p>
 	<ul>
-		<li>窓口：<a href="https://github.com/Kaikei-e/S4rCiv/issues" rel="external">github.com/Kaikei-e/S4rCiv（Issues）</a></li>
+		<li>窓口：<a href="https://github.com/Kaikei-e/S4RCIV/issues" rel="external">github.com/Kaikei-e/S4RCIV（Issues）</a></li>
 	</ul>
 	<p class="note">
 		GitHub の Issues は公開の場です。ご請求の内容に個人情報や非公開にすべき事項が含まれる場合は、まずその旨だけをお知らせください。個別の連絡方法をご案内します。運営者の氏名・所在地等は、法令に基づくご請求に応じ、必要な範囲で個別に開示します。

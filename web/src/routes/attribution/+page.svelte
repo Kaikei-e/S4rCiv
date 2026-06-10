@@ -60,6 +60,20 @@ https://laws.e-gov.go.jp/
 		本サービスを構成するソフトウェアは GNU Affero General Public License v3.0（AGPL-3.0）のもとで公開されています。稼働中の版に対応するソースコードは、次のリポジトリで入手できます。
 	</p>
 	<ul>
-		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4rCiv" rel="external">github.com/Kaikei-e/S4rCiv</a></li>
+		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4RCIV" rel="external">github.com/Kaikei-e/S4RCIV</a></li>
 	</ul>
+
+	<h2>フォント（SIL Open Font License 1.1）</h2>
+	<p>
+		本サービスは以下の書体をセルフホストで配信します（第三者へのリクエストはしません）。表示を高速化するため、<strong
+			>unicode-range によるサブセット化</strong
+		>を施していますが、デザインは原版のままです。いずれも <strong>SIL Open Font License 1.1（OFL-1.1）</strong
+		>のもとで配布されており、AGPL-3.0 のソフトウェアへの同梱が許諾されています。ライセンス全文は本リポジトリに同梱しています。
+	</p>
+	<ul>
+		<li>IBM Plex Sans JP / IBM Plex Sans / IBM Plex Mono — © IBM Corp.（OFL-1.1）</li>
+		<li>Zen Old Mincho — © The Zen Old Mincho Project Authors（OFL-1.1）</li>
+	</ul>
+	<p class="cite">SIL Open Font License 1.1 https://openfontlicense.org/
+ライセンス全文：本リポジトリ web/src/lib/fonts/OFL-*.txt</p>
 </DocPage>
