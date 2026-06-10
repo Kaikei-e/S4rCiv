@@ -145,6 +145,17 @@
 
 html {
 	color-scheme: dark;
+	/* breathing room above an anchored 条/発言 when jumping from the outline. */
+	scroll-padding-top: var(--s4);
+}
+
+/* Smooth anchor jumps only when the reader has not asked for reduced motion. This is
+   user-initiated navigation (outline / back-to-top), distinct from the unsolicited
+   auto-scroll DESIGN_LANGUAGE §10 forbids; under reduce it falls back to an instant jump. */
+@media (prefers-reduced-motion: no-preference) {
+	html {
+		scroll-behavior: smooth;
+	}
 }
 
 body {
