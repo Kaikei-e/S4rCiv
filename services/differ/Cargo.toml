@@ -14,7 +14,9 @@ path = "src/main.rs"
 
 [dependencies]
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+# Already in the tree via axum; the direct dep only enables the `limit` feature.
+tower = { version = "0.5", features = ["limit"] }
 prost = "0.14"
 quick-xml = "0.40"
 bytes = "1"

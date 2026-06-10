@@ -74,6 +74,23 @@ impl NodeType {
 /// `legislative.sentenceJoin` byte-for-byte.
 const SENTENCE_JOIN: char = '　'; // 全角スペース (U+3000)
 
+/// Maximum nesting depth of 号の細分 (`<Subitem{n}>`). Real 法令標準XML defines
+/// Subitem1..Subitem10, so 16 is generous; deeper nesting flags the parse
+/// degraded and the extra levels are skipped (CWE-400: each level repeats the
+/// full ancestor eId prefix, so unbounded depth amplifies memory quadratically).
+const MAX_SUBITEM_DEPTH: usize = 16;
+
+/// Maximum length (in chars) of a `Num` attribute flowing into an eId. Real Num
+/// tokens are a few characters (e.g. `9_2`); longer values are truncated and the
+/// parse flagged degraded, since an oversized Num would be copied into every
+/// descendant eId.
+const MAX_NUM_LEN: usize = 256;
+
+/// Maximum total node count per document. Beyond this the parse is flagged
+/// degraded and further nodes are dropped, bounding the node map on
+/// adversarial input.
+const MAX_NODE_COUNT: usize = 1_000_000;
+
 /// The result of parsing one snapshot.
 #[derive(Debug, Default)]
 pub struct ParsedLaw {
@@ -248,6 +265,9 @@ struct Builder {
     cur_item: Option<OpenItem>,
     /// Open 号の細分 stack (innermost last), so <Subitem2> nests under <Subitem1>.
     cur_subitems: Vec<OpenSubitem>,
+    /// Number of currently open `<Subitem{n}>`s skipped for exceeding
+    /// `MAX_SUBITEM_DEPTH`; their end tags must not pop the real stack.
+    skipped_subitem_depth: usize,
 
     /// Whether the current article has emitted at least one paragraph; if not,
     /// the article owns body text directly.
@@ -304,7 +324,18 @@ impl Builder {
         }
     }
 
+    /// Truncate an oversized `Num` to `MAX_NUM_LEN` chars, flagging the parse
+    /// degraded. Capping here (before any eId is built) keeps every eId bounded.
+    fn cap_num(&mut self, num: String) -> String {
+        if num.chars().count() <= MAX_NUM_LEN {
+            return num;
+        }
+        self.law.degraded = true;
+        num.chars().take(MAX_NUM_LEN).collect()
+    }
+
     fn on_start(&mut self, name: &str, num: Option<String>) {
+        let num = num.map(|n| self.cap_num(n));
         match name {
             "SupplProvision" => {
                 self.in_suppl = true;
@@ -499,15 +530,23 @@ impl Builder {
             TextSink::SubitemSentence => self.cur_subitems.last_mut().map(|s| &mut s.text),
             _ => None,
         };
-        if let Some(buf) = buf {
-            if !buf.is_empty() {
-                buf.push(SENTENCE_JOIN);
-            }
+        if let Some(buf) = buf
+            && !buf.is_empty()
+        {
+            buf.push(SENTENCE_JOIN);
         }
     }
 
     /// Open a 号の細分. Its parent is the innermost open subitem, else the current item.
     fn open_subitem(&mut self, level: usize, num: Option<String>) {
+        if self.cur_subitems.len() >= MAX_SUBITEM_DEPTH {
+            // Deeper than any real 法令標準XML nests; skip the level (its end tag
+            // is swallowed via skipped_subitem_depth) and degrade instead of
+            // letting the eId prefix grow without bound.
+            self.law.degraded = true;
+            self.skipped_subitem_depth += 1;
+            return;
+        }
         let (parent_eid, default_num) = if let Some(top) = self.cur_subitems.last_mut() {
             top.child_ordinal += 1;
             (top.eid.clone(), top.child_ordinal)
@@ -536,6 +575,11 @@ impl Builder {
     /// Close the innermost open subitem, linking it to its parent (the next subitem on
     /// the stack, else the current item).
     fn close_subitem(&mut self) {
+        if self.skipped_subitem_depth > 0 {
+            // End tag of a level skipped for exceeding MAX_SUBITEM_DEPTH.
+            self.skipped_subitem_depth -= 1;
+            return;
+        }
         if let Some(sub) = self.cur_subitems.pop() {
             let parent_eid = self
                 .cur_subitems
@@ -556,6 +600,12 @@ impl Builder {
     }
 
     fn push(&mut self, node: Node) {
+        if self.law.nodes.len() >= MAX_NODE_COUNT {
+            // Stop accumulating beyond the per-document cap; the degraded flag
+            // tells the classifier the node map is incomplete.
+            self.law.degraded = true;
+            return;
+        }
         if self.law.nodes.insert(node.eid.clone(), node).is_some() {
             // Duplicate eId means a malformed law or a derivation bug — flag
             // degraded so the classifier drops to low confidence.
@@ -599,4 +649,110 @@ fn has_subitem_suffix(name: &str, suffix: &str) -> bool {
     name.strip_prefix("Subitem")
         .and_then(|r| r.strip_suffix(suffix))
         .is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Write as _;
+
+    use super::*;
+
+    /// A minimal law whose single item carries `depth` nested 号の細分 levels
+    /// (`<Subitem1>` > `<Subitem2>` > …), each with a short Num.
+    fn law_with_subitem_depth(depth: usize) -> String {
+        let mut xml = String::from(
+            r#"<Law><LawBody><MainProvision><Article Num="1"><Paragraph Num="1"><ParagraphSentence><Sentence>本文。</Sentence></ParagraphSentence><Item Num="1"><ItemSentence><Sentence>号。</Sentence></ItemSentence>"#,
+        );
+        for level in 1..=depth {
+            write!(
+                xml,
+                "<Subitem{level} Num=\"1\"><Subitem{level}Sentence><Sentence>細分。</Sentence></Subitem{level}Sentence>"
+            )
+            .expect("write to String");
+        }
+        for level in (1..=depth).rev() {
+            write!(xml, "</Subitem{level}>").expect("write to String");
+        }
+        xml.push_str("</Item></Paragraph></Article></MainProvision></LawBody></Law>");
+        xml
+    }
+
+    fn subitem_count(law: &ParsedLaw) -> usize {
+        law.nodes
+            .values()
+            .filter(|n| n.node_type == NodeType::Subitem)
+            .count()
+    }
+
+    #[test]
+    fn subitem_depth_at_cap_parses_cleanly() {
+        let law = parse(law_with_subitem_depth(MAX_SUBITEM_DEPTH).as_bytes()).expect("parse");
+        assert!(!law.degraded, "depth == cap must not degrade");
+        assert_eq!(subitem_count(&law), MAX_SUBITEM_DEPTH);
+    }
+
+    #[test]
+    fn subitem_depth_beyond_cap_degrades_and_stops_accumulating() {
+        let law = parse(law_with_subitem_depth(MAX_SUBITEM_DEPTH + 8).as_bytes()).expect("parse");
+        assert!(law.degraded, "depth beyond cap must degrade");
+        assert_eq!(
+            subitem_count(&law),
+            MAX_SUBITEM_DEPTH,
+            "levels beyond the cap must be dropped, not accumulated"
+        );
+        // The surrounding article/paragraph/item still materialize normally.
+        assert!(law.nodes.contains_key("art_1__para_1__item_1"));
+    }
+
+    #[test]
+    fn oversized_num_is_truncated_and_degrades() {
+        let long_num = "9".repeat(MAX_NUM_LEN + 100);
+        let xml = format!(
+            r#"<Law><LawBody><MainProvision><Article Num="{long_num}"><Paragraph Num="1"><ParagraphSentence><Sentence>本文。</Sentence></ParagraphSentence></Paragraph></Article></MainProvision></LawBody></Law>"#
+        );
+        let law = parse(xml.as_bytes()).expect("parse");
+        assert!(law.degraded, "oversized Num must degrade");
+
+        let truncated_eid = format!("art_{}", "9".repeat(MAX_NUM_LEN));
+        assert!(law.nodes.contains_key(&truncated_eid));
+        // The truncated Num is what flows into descendant eIds, so they stay bounded.
+        assert!(law.nodes.contains_key(&format!("{truncated_eid}__para_1")));
+    }
+
+    #[test]
+    fn multibyte_num_at_boundary_truncates_on_char_boundary() {
+        // 漢数字 Num: char-based truncation must not split a UTF-8 sequence (no panic).
+        let long_num = "九".repeat(MAX_NUM_LEN + 1);
+        let xml = format!(
+            r#"<Law><LawBody><MainProvision><Article Num="{long_num}"/></MainProvision></LawBody></Law>"#
+        );
+        let law = parse(xml.as_bytes()).expect("parse");
+        assert!(law.degraded);
+        assert!(
+            law.nodes
+                .contains_key(&format!("art_{}", "九".repeat(MAX_NUM_LEN)))
+        );
+    }
+
+    #[test]
+    fn node_count_beyond_cap_stops_accumulating() {
+        // Exercise the cap directly on the Builder: driving 1M+ nodes through the
+        // XML reader would dominate the test suite's runtime for no extra coverage.
+        let mut builder = Builder::default();
+        for i in 0..(MAX_NODE_COUNT + 5) {
+            let ordinal = builder.next_ordinal();
+            builder.push(Node {
+                eid: format!("art_{i}"),
+                node_type: NodeType::Article,
+                num: i.to_string(),
+                sentence_text: String::new(),
+                caption: String::new(),
+                parent_eid: String::new(),
+                ordinal,
+            });
+        }
+        let law = builder.finish();
+        assert!(law.degraded, "node count beyond cap must degrade");
+        assert_eq!(law.nodes.len(), MAX_NODE_COUNT);
+    }
 }
