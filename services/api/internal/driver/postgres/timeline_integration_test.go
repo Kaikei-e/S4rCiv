@@ -74,3 +74,88 @@ func TestListTimeline_ScalarNodeChangesDoesNotFailQuery(t *testing.T) {
 			got.NodesAdded, got.NodesDeleted, got.NodesModified)
 	}
 }
+
+// The keyword filter must match LIKE/ILIKE metacharacters (% _ \) LITERALLY:
+// escapeLike escapes the user keyword and the queries declare ESCAPE '\'.
+// Unescaped, "100%" would act as "100<anything>" and also match "1000…" titles
+// (and the bare ESCAPE syntax itself must round-trip through pgx/Postgres).
+func TestListTimeline_KeywordMatchesLikeMetacharactersLiterally(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pool := newTestDB(t)
+
+	// Two egov-law streams whose read-model titles differ only in literal-vs-wildcard
+	// interpretation of "100%". Fictional law titles.
+	laws := []struct {
+		n     int
+		lawID string
+		title string
+	}{
+		{1, "599AC9990000001", "架空数値を100%とする法律"},
+		{2, "599AC9990000002", "架空数値を1000とする法律"},
+	}
+	for _, l := range laws {
+		streamID := "egov-law:" + l.lawID
+		if err := NewEventLog(pool).EnsureStream(ctx, port.Stream{
+			StreamID: streamID, Source: "egov-law", SourceLocalKey: l.lawID,
+			CanonicalURL: "https://laws.e-gov.go.jp/law/" + l.lawID,
+		}); err != nil {
+			t.Fatalf("ensure stream %s: %v", l.lawID, err)
+		}
+		body := []byte("<Law>" + l.lawID + "</Law>")
+		snap := &port.Snapshot{
+			ContentHash: obs.SumBytes(body), Bytes: body, ByteSize: int64(len(body)), MediaType: "application/xml",
+		}
+		if err := ensureSnapshot(ctx, pool, snap); err != nil {
+			t.Fatalf("ensure snapshot %s: %v", l.lawID, err)
+		}
+		ch := snap.ContentHash
+		if err := rawInsert(ctx, pool, obs.EventFacts{
+			EventID: uuidN(l.n), StreamID: streamID, StreamSeq: 1,
+			Type: obs.ResourceObserved, Source: "egov-law", FetcherVersion: "itest/0.1",
+			ObservedAt: baseObserved, ContentHash: &ch, LogPrevHash: headOf(t, pool),
+		}); err != nil {
+			t.Fatalf("insert event %s: %v", l.lawID, err)
+		}
+		var seq int64
+		if err := pool.QueryRow(ctx,
+			`SELECT seq FROM observation.event WHERE event_id = $1`, uuidN(l.n)).Scan(&seq); err != nil {
+			t.Fatalf("read seq %s: %v", l.lawID, err)
+		}
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO interpretation.legislative_work
+				(law_id, stream_id, law_title, observation_seq, observed_at)
+			VALUES ($1, $2, $3, $4, $5)`,
+			l.lawID, streamID, l.title, seq, baseObserved); err != nil {
+			t.Fatalf("seed legislative_work %s: %v", l.lawID, err)
+		}
+	}
+
+	reader := NewQueryReader(pool)
+	cases := []struct {
+		keyword string
+		want    int
+	}{
+		{"100%", 1}, // literal "100%" only — NOT a "100<anything>" wildcard
+		{"100_", 0}, // literal "100_" nowhere — NOT a one-rune wildcard over "1000"/"100%"
+		{`100\`, 0}, // a lone backslash must not break the pattern (22025) or match
+		{"100", 2},  // sanity: plain substring still matches both
+	}
+	for _, tc := range cases {
+		f := port.TimelineFilter{Keyword: tc.keyword, Limit: 50}
+		items, err := reader.ListTimeline(ctx, f)
+		if err != nil {
+			t.Fatalf("ListTimeline(keyword=%q): %v", tc.keyword, err)
+		}
+		if len(items) != tc.want {
+			t.Errorf("ListTimeline(keyword=%q) rows = %d, want %d", tc.keyword, len(items), tc.want)
+		}
+		total, _, err := reader.CountTimeline(ctx, f, 0)
+		if err != nil {
+			t.Fatalf("CountTimeline(keyword=%q): %v", tc.keyword, err)
+		}
+		if total != tc.want {
+			t.Errorf("CountTimeline(keyword=%q) total = %d, want %d", tc.keyword, total, tc.want)
+		}
+	}
+}

@@ -73,12 +73,14 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		  AND ($4 = '' OR c.classification = $4)
 		  AND (NULLIF($5,'')::timestamptz IS NULL OR e.observed_at >= NULLIF($5,'')::timestamptz)
 		  AND (NULLIF($6,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($6,'')::timestamptz)
-		  AND ($7 = '' OR m.meeting_name ILIKE '%'||$7||'%' OR lw.law_title ILIKE '%'||$7||'%'
-		               OR lw.law_num ILIKE '%'||$7||'%' OR lw.category ILIKE '%'||$7||'%')
+		  AND ($7 = '' OR m.meeting_name ILIKE '%'||$7||'%' ESCAPE '\'
+		               OR lw.law_title  ILIKE '%'||$7||'%' ESCAPE '\'
+		               OR lw.law_num    ILIKE '%'||$7||'%' ESCAPE '\'
+		               OR lw.category   ILIKE '%'||$7||'%' ESCAPE '\')
 		ORDER BY e.seq __ORDER__
 		LIMIT $8`)
 	rows, err := q.pool.Query(ctx, sql,
-		f.CursorSeq, f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, f.Limit)
+		f.CursorSeq, f.Source, f.EventType, f.Classification, f.Since, f.Until, escapeLike(f.Keyword), f.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -183,17 +185,27 @@ func (q *QueryReader) CountTimeline(ctx context.Context, f port.TimelineFilter, 
 		    AND ($3 = '' OR c.classification = $3)
 		    AND (NULLIF($4,'')::timestamptz IS NULL OR e.observed_at >= NULLIF($4,'')::timestamptz)
 		    AND (NULLIF($5,'')::timestamptz IS NULL OR e.observed_at <  NULLIF($5,'')::timestamptz)
-		    AND ($6 = '' OR m.meeting_name ILIKE '%'||$6||'%' OR lw.law_title ILIKE '%'||$6||'%'
-		                 OR lw.law_num ILIKE '%'||$6||'%' OR lw.category ILIKE '%'||$6||'%')
+		    AND ($6 = '' OR m.meeting_name ILIKE '%'||$6||'%' ESCAPE '\'
+		                 OR lw.law_title  ILIKE '%'||$6||'%' ESCAPE '\'
+		                 OR lw.law_num    ILIKE '%'||$6||'%' ESCAPE '\'
+		                 OR lw.category   ILIKE '%'||$6||'%' ESCAPE '\')
 		  LIMIT $8
 		) capped`,
-		f.Source, f.EventType, f.Classification, f.Since, f.Until, f.Keyword, aboveSeq, CountTimelineCap,
+		f.Source, f.EventType, f.Classification, f.Since, f.Until, escapeLike(f.Keyword), aboveSeq, CountTimelineCap,
 	).Scan(&total, &above)
 	if err != nil {
 		return 0, 0, err
 	}
 	return total, above, nil
 }
+
+// likeEscaper escapes the LIKE/ILIKE pattern metacharacters (\ % _) so a keyword
+// matches literally instead of acting as a wildcard (CWE-20); the queries above
+// declare the matching ESCAPE '\'. Postgres runs with standard_conforming_strings
+// on, so '\' in the SQL text is a single literal backslash.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+func escapeLike(s string) string { return likeEscaper.Replace(s) }
 
 func meetingSubtitle(session int, house, issue, date string) string {
 	var parts []string

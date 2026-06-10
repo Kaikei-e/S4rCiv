@@ -27,8 +27,8 @@ func New(reader port.QueryReader, lawReader port.LawQueryReader) *Handler {
 
 func (h *Handler) GetMeeting(ctx context.Context, req *connect.Request[queryv1.GetMeetingRequest]) (*connect.Response[queryv1.GetMeetingResponse], error) {
 	id := req.Msg.GetIssueId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("issue_id is required"))
+	if err := requireID("issue_id", id); err != nil {
+		return nil, err
 	}
 	mv, speeches, found, err := h.reader.Meeting(ctx, id)
 	if err != nil {
@@ -68,8 +68,8 @@ func (h *Handler) ListMeetings(ctx context.Context, req *connect.Request[queryv1
 
 func (h *Handler) GetVoteEvent(ctx context.Context, req *connect.Request[queryv1.GetVoteEventRequest]) (*connect.Response[queryv1.GetVoteEventResponse], error) {
 	id := req.Msg.GetVoteEventId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("vote_event_id is required"))
+	if err := requireID("vote_event_id", id); err != nil {
+		return nil, err
 	}
 	v, found, err := h.reader.VoteEvent(ctx, id)
 	if err != nil {
@@ -154,8 +154,8 @@ func (h *Handler) ListSangiinVoteEvents(ctx context.Context, req *connect.Reques
 
 func (h *Handler) GetSangiinVoteMap(ctx context.Context, req *connect.Request[queryv1.GetSangiinVoteMapRequest]) (*connect.Response[queryv1.GetSangiinVoteMapResponse], error) {
 	id := req.Msg.GetVoteEventId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("vote_event_id is required"))
+	if err := requireID("vote_event_id", id); err != nil {
+		return nil, err
 	}
 	v, found, err := h.reader.GetSangiinVoteMap(ctx, id)
 	if err != nil {
@@ -186,8 +186,8 @@ func (h *Handler) GetSangiinVoteMap(ctx context.Context, req *connect.Request[qu
 
 func (h *Handler) GetLaw(ctx context.Context, req *connect.Request[queryv1.GetLawRequest]) (*connect.Response[queryv1.GetLawResponse], error) {
 	id := req.Msg.GetLawId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("law_id is required"))
+	if err := requireID("law_id", id); err != nil {
+		return nil, err
 	}
 	lv, nodes, found, err := h.lawReader.GetLaw(ctx, id)
 	if err != nil {
@@ -227,8 +227,8 @@ func (h *Handler) ListLaws(ctx context.Context, req *connect.Request[queryv1.Lis
 
 func (h *Handler) GetLawChanges(ctx context.Context, req *connect.Request[queryv1.GetLawChangesRequest]) (*connect.Response[queryv1.GetLawChangesResponse], error) {
 	id := req.Msg.GetLawId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("law_id is required"))
+	if err := requireID("law_id", id); err != nil {
+		return nil, err
 	}
 	limit := int(req.Msg.GetPageSize())
 	if limit <= 0 || limit > 200 {
@@ -255,6 +255,14 @@ func (h *Handler) ListTimeline(ctx context.Context, req *connect.Request[queryv1
 	limit := int(req.Msg.GetPageSize())
 	if limit <= 0 || limit > 200 {
 		limit = 50
+	}
+	// Reject malformed timestamp filters before they reach the driver, where the
+	// ::timestamptz cast would fail with SQLSTATE 22007 and surface as CodeInternal.
+	if err := validateRFC3339("since", req.Msg.GetSince()); err != nil {
+		return nil, err
+	}
+	if err := validateRFC3339("until", req.Msg.GetUntil()); err != nil {
+		return nil, err
 	}
 	cursorSeq, backward := parseTimelineCursor(req.Msg.GetPageToken())
 	f := port.TimelineFilter{
@@ -351,8 +359,8 @@ func toTimelineItem(v port.TimelineItemView) *queryv1.TimelineItem {
 
 func (h *Handler) ListLegislatorVotes(ctx context.Context, req *connect.Request[queryv1.ListLegislatorVotesRequest]) (*connect.Response[queryv1.ListLegislatorVotesResponse], error) {
 	id := req.Msg.GetPersonId()
-	if id == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("person_id is required"))
+	if err := requireID("person_id", id); err != nil {
+		return nil, err
 	}
 	limit := int(req.Msg.GetPageSize())
 	if limit <= 0 || limit > 200 {
@@ -516,8 +524,8 @@ func toVoteEvent(v port.VoteEventView) *queryv1.VoteEvent {
 // "verified" flag; it returns ground-truth fields and lets the reader judge.
 func (h *Handler) GetStreamVerification(ctx context.Context, req *connect.Request[queryv1.GetStreamVerificationRequest]) (*connect.Response[queryv1.GetStreamVerificationResponse], error) {
 	streamID := req.Msg.GetStreamId()
-	if streamID == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("stream_id is required"))
+	if err := requireID("stream_id", streamID); err != nil {
+		return nil, err
 	}
 	view, found, err := h.reader.StreamVerification(ctx, streamID)
 	if err != nil {
@@ -640,6 +648,11 @@ func capKeyword(s string) string {
 	return s
 }
 
+// maxPageOffset caps OFFSET pagination so a forged page token cannot force the DB
+// to scan-and-discard an arbitrary number of rows per request (CWE-400). Out-of-range
+// tokens clamp to the cap (the deepest reachable page) rather than resetting to 0.
+const maxPageOffset = 100000
+
 func parseOffset(token string) int {
 	if token == "" {
 		return 0
@@ -648,5 +661,35 @@ func parseOffset(token string) int {
 	if err != nil || n < 0 {
 		return 0
 	}
-	return n
+	return min(n, maxPageOffset)
+}
+
+// maxIDLen bounds every caller-supplied identifier (issue_id, law_id, person_id,
+// vote_event_id, stream_id). Real IDs are well under this; rejecting longer input
+// bounds both the per-query work and the bytes a NotFound message reflects back
+// (CWE-20). requireID returns a ready-to-return *connect.Error or nil.
+const maxIDLen = 64
+
+func requireID(field, id string) error {
+	if id == "" {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s is required", field))
+	}
+	if len(id) > maxIDLen {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%s must be at most %d bytes", field, maxIDLen))
+	}
+	return nil
+}
+
+// validateRFC3339 rejects a non-empty timestamp filter that Postgres would fail to
+// cast (SQLSTATE 22007 → CodeInternal) with a CodeInvalidArgument up front. The raw
+// value is deliberately not echoed back. Empty stays allowed (= no filter).
+func validateRFC3339(field, s string) error {
+	if s == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.RFC3339, s); err != nil {
+		return connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("%s must be an RFC3339 timestamp (e.g. 2026-01-02T00:00:00Z)", field))
+	}
+	return nil
 }

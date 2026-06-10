@@ -9,16 +9,30 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Option tweaks the pool config built by Connect before the pool is created.
+type Option func(*pgxpool.Config)
+
+// WithStatementTimeout sets a server-side statement_timeout on every connection,
+// so a single pathological query cannot hold a backend indefinitely (CWE-400).
+// Apply this on the read-only query side ONLY — the collector's reproject /
+// projection statements may legitimately run long and must stay unbounded.
+func WithStatementTimeout(d time.Duration) Option {
+	return func(cfg *pgxpool.Config) {
+		cfg.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(d.Milliseconds(), 10)
+	}
+}
+
 // Connect builds a pool from the standard env vars. The password is read from
 // the mounted Docker secret file (DB_PASSWORD_FILE) and never placed in an env
 // var or logged.
-func Connect(ctx context.Context) (*pgxpool.Pool, error) {
+func Connect(ctx context.Context, opts ...Option) (*pgxpool.Pool, error) {
 	pw, err := readSecret(os.Getenv("DB_PASSWORD_FILE"))
 	if err != nil {
 		return nil, err
@@ -39,6 +53,9 @@ func Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	}
 	cfg.MaxConns = 8
 	cfg.MaxConnLifetime = time.Hour
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err

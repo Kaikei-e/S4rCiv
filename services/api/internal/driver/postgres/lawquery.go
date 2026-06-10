@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -155,13 +156,18 @@ func (q *LawQueryReader) GetLawChanges(ctx context.Context, lawID string, limit,
 			return nil, err
 		}
 		var p diffPayload
-		if err := json.Unmarshal(raw, &p); err == nil {
-			for _, nc := range p.NodeChanges {
-				cv.NodeChanges = append(cv.NodeChanges, port.NodeChange{
-					EID: nc.EID, Op: nc.Op, NodeType: nc.NodeType, Num: nc.Num,
-					PrevText: nc.PrevText, CurrText: nc.CurrText,
-				})
-			}
+		if err := json.Unmarshal(raw, &p); err != nil {
+			// A single undecodable diff payload must not fail the whole change list;
+			// degrade the row to "no node changes", but say so server-side instead of
+			// swallowing the data problem silently (CWE-392).
+			slog.Warn("skipping undecodable diff payload",
+				"law_id", lawID, "observation_seq", cv.ObservationSeq, "error", err)
+		}
+		for _, nc := range p.NodeChanges {
+			cv.NodeChanges = append(cv.NodeChanges, port.NodeChange{
+				EID: nc.EID, Op: nc.Op, NodeType: nc.NodeType, Num: nc.Num,
+				PrevText: nc.PrevText, CurrText: nc.CurrText,
+			})
 		}
 		out = append(out, cv)
 	}

@@ -27,7 +27,10 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := postgres.Connect(ctx)
+	// 10s statement_timeout: every query here is a bounded read-model lookup, so a
+	// statement still running after 10s is a runaway, not work worth finishing
+	// (CWE-400). Query side only — the collector's long projections stay unbounded.
+	pool, err := postgres.Connect(ctx, postgres.WithStatementTimeout(10*time.Second))
 	if err != nil {
 		log.Fatalf("connect db: %v", err)
 	}
@@ -37,7 +40,11 @@ func main() {
 	mux := http.NewServeMux()
 	// SanitizeErrors keeps raw internal/DB error detail out of RPC responses (CWE-209);
 	// the BFF/browser only ever sees a generic message for Internal/Unknown failures.
-	mux.Handle(queryv1connect.NewQueryServiceHandler(handler, connect.WithInterceptors(queryrpc.SanitizeErrors())))
+	// ReadMaxBytes caps the decoded request message at 1 MiB — every RPC here takes a
+	// small filter/ID message, so anything larger is hostile (CWE-400).
+	mux.Handle(queryv1connect.NewQueryServiceHandler(handler,
+		connect.WithInterceptors(queryrpc.SanitizeErrors()),
+		connect.WithReadMaxBytes(1<<20)))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
