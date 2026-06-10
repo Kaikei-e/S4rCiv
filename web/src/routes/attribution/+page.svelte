@@ -60,6 +60,6 @@ https://laws.e-gov.go.jp/
 		本サービスを構成するソフトウェアは GNU Affero General Public License v3.0（AGPL-3.0）のもとで公開されています。稼働中の版に対応するソースコードは、次のリポジトリで入手できます。
 	</p>
 	<ul>
-		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4rCiv" rel="external">github.com/Kaikei-e/S4rCiv</a></li>
+		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4RCIV" rel="external">github.com/Kaikei-e/S4RCIV</a></li>
 	</ul>
 </DocPage>

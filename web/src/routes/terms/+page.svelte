@@ -97,7 +97,7 @@
 		が利用者に付与する権利（ソースコードの入手・改変・再頒布等）を制限するものではありません。
 	</p>
 	<ul>
-		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4rCiv" rel="external">github.com/Kaikei-e/S4rCiv</a></li>
+		<li>ソースコード：<a href="https://github.com/Kaikei-e/S4RCIV" rel="external">github.com/Kaikei-e/S4RCIV</a></li>
 	</ul>
 
 	<h2>8. 規約の変更</h2>

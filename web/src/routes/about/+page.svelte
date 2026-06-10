@@ -60,7 +60,7 @@
 		を窓口とします。
 	</p>
 	<ul>
-		<li>リポジトリ / 連絡：<a href="https://github.com/Kaikei-e/S4rCiv" rel="external">github.com/Kaikei-e/S4rCiv</a></li>
+		<li>リポジトリ / 連絡：<a href="https://github.com/Kaikei-e/S4RCIV" rel="external">github.com/Kaikei-e/S4RCIV</a></li>
 	</ul>
 
 	<h2>関連ページ</h2>

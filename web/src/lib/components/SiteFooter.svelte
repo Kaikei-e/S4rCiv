@@ -3,7 +3,7 @@
 	// source offer, and links to the policy pages. The source link satisfies AGPL-3.0 §13
 	// (prominently offer the running version's Corresponding Source to all network users);
 	// it points at the public repository. Static — no visitor data, no third-party request.
-	const SOURCE_URL = 'https://github.com/Kaikei-e/S4rCiv';
+	const SOURCE_URL = 'https://github.com/Kaikei-e/S4RCIV';
 </script>
 
 <footer class="site-foot">
