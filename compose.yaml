@@ -1,5 +1,14 @@
 name: s4rciv
 
+# Network segmentation (audit F-19): cloudflared sees only web, web sees only
+# api, and only the backend services reach db/differ. Resource ceilings
+# (mem_limit/pids_limit, audit F-21) bound the blast radius of a DoS on any
+# single service so it cannot OOM the host.
+networks:
+  edge: {}
+  app: {}
+  data: {}
+
 services:
   db:
     image: postgres:18.4-trixie@sha256:8ff36f3c66371cba71d20ceedccfc3de9669a68737607888c4ef0af93abe8e39
@@ -23,6 +32,10 @@ services:
       start_period: 10s
     security_opt:
       - no-new-privileges:true
+    networks:
+      - data
+    mem_limit: 2g
+    pids_limit: 512
     restart: unless-stopped
 
   migrate:
@@ -53,6 +66,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    networks:
+      - data
+    mem_limit: 512m
+    pids_limit: 256
     restart: "no"
 
   api:
@@ -66,12 +83,15 @@ services:
       API_PORT: "8080"
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
-      POSTGRES_USER: ${POSTGRES_USER}
+      # Read-only role (audit F-09): the query side must not connect as the
+      # table owner. Login/password are enabled once per environment via
+      # scripts/set-api-ro-password.sh (migration 20260610000018).
+      POSTGRES_USER: api_ro
       POSTGRES_DB: ${POSTGRES_DB}
-      DB_PASSWORD_FILE: /run/secrets/db_password
+      DB_PASSWORD_FILE: /run/secrets/api_db_password
       USER_AGENT: ${USER_AGENT}
     secrets:
-      - db_password
+      - api_db_password
     ports:
       - "127.0.0.1:${API_HOST_PORT:-8080}:8080"
     healthcheck:
@@ -85,6 +105,11 @@ services:
     cap_drop:
       - ALL
     read_only: true
+    networks:
+      - app
+      - data
+    mem_limit: 512m
+    pids_limit: 256
     restart: unless-stopped
 
   collector:
@@ -118,6 +143,10 @@ services:
     cap_drop:
       - ALL
     read_only: true
+    networks:
+      - data
+    mem_limit: 768m
+    pids_limit: 256
     restart: unless-stopped
 
   # Second command-side daemon for the egov-law source. The kokkai and egov-law
@@ -150,6 +179,10 @@ services:
     cap_drop:
       - ALL
     read_only: true
+    networks:
+      - data
+    mem_limit: 768m
+    pids_limit: 256
     restart: unless-stopped
 
   differ:
@@ -165,6 +198,10 @@ services:
     cap_drop:
       - ALL
     read_only: true
+    networks:
+      - data
+    mem_limit: 1g
+    pids_limit: 256
     restart: unless-stopped
 
   web:
@@ -198,6 +235,11 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    networks:
+      - edge
+      - app
+    mem_limit: 768m
+    pids_limit: 256
     restart: unless-stopped
 
 volumes:
@@ -206,5 +248,7 @@ volumes:
 secrets:
   db_password:
     file: ./secrets/db_password.txt
+  api_db_password:
+    file: ./secrets/api_db_password.txt
   checkpoint_signing_key:
     file: ./secrets/checkpoint_signing_key.txt

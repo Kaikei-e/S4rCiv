@@ -36,6 +36,17 @@ services:
   collector-egov:
     profiles: ["daemons"]
 
+  # The E2E api runs with the owner role + db_password instead of api_ro:
+  # the read-only role's login/password is enabled by an operator step
+  # (scripts/set-api-ro-password.sh) that the hermetic test stack skips.
+  # Privilege separation itself is covered by the integration suite.
+  api:
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+
   # Go unit + integration test runner. `run --rm` starts only this + its depends_on,
   # returns the `go test` exit code directly, and the container is removed after.
   test-runner:
@@ -58,6 +69,10 @@ services:
       - db_password
     volumes:
       - ./db/migrations:/migrations:ro
+    # compose.yaml now segments networks; the runner must sit on `data` to
+    # reach db (services without a `networks:` key land on `default`).
+    networks:
+      - data
     # Default: unit only. The Makefile overrides with -tags=integration for the
     # real-DB suite. go test needs a writable cache/tmp.
     command: ["go", "test", "./..."]
@@ -82,6 +97,8 @@ services:
       USER_AGENT: ${USER_AGENT:-s4rciv-test}
     secrets:
       - db_password
+    networks:
+      - data
     # Reuses the deterministic seeding helpers behind the e2eseed build tag; writes
     # the fixed fixture set into the E2E s4rciv database (NOT a template clone).
     command: ["go", "test", "-tags=e2eseed", "-run", "^TestSeedE2E$", "-count=1", "./internal/e2eseed/..."]
