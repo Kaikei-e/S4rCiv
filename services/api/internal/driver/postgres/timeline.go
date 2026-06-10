@@ -40,15 +40,27 @@ func (q *QueryReader) ListTimeline(ctx context.Context, f port.TimelineFilter) (
 		  lw.law_id, COALESCE(lw.law_title,''), COALESCE(lw.law_num,''),
 		  COALESCE(lw.permalink,''), COALESCE(lw.was_ocr,false),
 		  COALESCE(c.classification,''), COALESCE(c.class_confidence,''),
-		  COALESCE((SELECT count(*) FROM jsonb_array_elements(c.diff->'node_changes') nc WHERE nc->>'op'='added'),0),
-		  COALESCE((SELECT count(*) FROM jsonb_array_elements(c.diff->'node_changes') nc WHERE nc->>'op'='deleted'),0),
-		  COALESCE((SELECT count(*) FROM jsonb_array_elements(c.diff->'node_changes') nc WHERE nc->>'op'='modified'),0),
+		  COALESCE(ncc.added,0), COALESCE(ncc.deleted,0), COALESCE(ncc.modified,0),
 		  COALESCE((SELECT ve.vote_event_id FROM interpretation.vote_event ve
 		            WHERE ve.observation_seq = e.seq ORDER BY ve.vote_event_id LIMIT 1),'')
 		FROM observation.event e
 		LEFT JOIN interpretation.meeting m           ON m.stream_id = e.stream_id
 		LEFT JOIN interpretation.legislative_work lw ON lw.stream_id = e.stream_id
 		LEFT JOIN interpretation.change c            ON c.observation_seq = e.seq
+		-- Expand node_changes ONCE and derive the add/delete/modify counts via FILTER.
+		-- The CASE is the load-bearing guard: jsonb_array_elements() raises 22023
+		-- ("cannot extract elements from a scalar") if node_changes is ever a JSON scalar
+		-- (e.g. a legacy null from a nil-slice serialization) instead of an array, and a
+		-- fault in a SELECT-list expression fails the WHOLE query — so a single malformed
+		-- read-model row would blank the entire timeline. Treat non-arrays as empty.
+		LEFT JOIN LATERAL (
+		  SELECT count(*) FILTER (WHERE nc->>'op'='added')    AS added,
+		         count(*) FILTER (WHERE nc->>'op'='deleted')  AS deleted,
+		         count(*) FILTER (WHERE nc->>'op'='modified') AS modified
+		  FROM jsonb_array_elements(
+		    CASE WHEN jsonb_typeof(c.diff->'node_changes') = 'array'
+		         THEN c.diff->'node_changes' ELSE '[]'::jsonb END) nc
+		) ncc ON true
 		WHERE __CURSOR__
 		  -- The timeline only shows the sources it can ENRICH with a headline read model
 		  -- (kokkai 会議録 / egov-law 法令). Vote-map support sources (giin-roster,

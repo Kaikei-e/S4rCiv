@@ -113,7 +113,13 @@ func (d *Differ) handle(ctx context.Context, ev port.ObservedEvent) (bool, error
 		return false, fmt.Errorf("compute change: %w", err)
 	}
 
-	payload := diffJSON{LawID: lawIDOf(ev.StreamID)}
+	// node_changes MUST serialize as a JSON array even when empty. A nil Go slice
+	// marshals to `null`, which is a JSON scalar; the timeline read model expands
+	// this field with jsonb_array_elements, and a scalar there raises SQLSTATE 22023
+	// ("cannot extract elements from a scalar"), failing the whole list query — one
+	// administrative change with zero structural node deltas would blank the public
+	// timeline. Initialising to a non-nil empty slice keeps empty → `[]` (ADR-000024).
+	payload := diffJSON{LawID: lawIDOf(ev.StreamID), NodeChanges: []nodeChangeJSON{}}
 	for _, nc := range res.NodeChanges {
 		payload.NodeChanges = append(payload.NodeChanges, nodeChangeJSON{
 			EID: nc.EID, Op: nc.Op, NodeType: nc.NodeType, Num: nc.Num,

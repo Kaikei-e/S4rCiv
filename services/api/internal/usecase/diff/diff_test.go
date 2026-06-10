@@ -3,6 +3,7 @@ package diff
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -120,6 +121,43 @@ func TestChangedEventComputesAndStores(t *testing.T) {
 
 	if offsets.off != 2 {
 		t.Fatalf("offset = %d, want 2", offsets.off)
+	}
+}
+
+// An administrative change with zero structural node deltas must still serialize
+// node_changes as a JSON array. A nil Go slice marshals to `null` (a JSON scalar),
+// and the timeline read model expands this field with jsonb_array_elements, which
+// raises SQLSTATE 22023 on a scalar and fails the whole list query — one such row
+// would blank the public timeline (regression guard for ADR-000024).
+func TestEmptyNodeChangesSerializeAsArrayNotNull(t *testing.T) {
+	stream := "egov-law:327R00000001003"
+	reader := fakeReader{
+		evs: []port.ObservedEvent{
+			{Seq: 1, StreamID: stream, Type: obs.ResourceChanged,
+				SnapshotBytes: []byte("<Law>v2</Law>")},
+		},
+		prev: map[string][]byte{stream: []byte("<Law>v1</Law>")},
+	}
+	// Differ reports an administrative change with NO node changes (nil slice).
+	client := &fakeClient{res: port.DiffResult{
+		DifferVersion: "differ/0.1.0", Classification: "administrative", ClassConfidence: "high",
+		NodeChanges: nil,
+	}}
+	store := &fakeChangeStore{}
+	d := New(reader, client, store, &fakeOffsets{}, "egov-differ")
+
+	if _, err := d.Run(context.Background()); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(store.records) != 1 {
+		t.Fatalf("records=%d, want 1", len(store.records))
+	}
+	raw := string(store.records[0].DiffJSON)
+	if strings.Contains(raw, `"node_changes":null`) {
+		t.Fatalf("node_changes serialized as JSON null (scalar) — poisons timeline: %s", raw)
+	}
+	if !strings.Contains(raw, `"node_changes":[]`) {
+		t.Fatalf("node_changes not an empty array: %s", raw)
 	}
 }
 
