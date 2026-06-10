@@ -1,7 +1,6 @@
 <script lang="ts">
 	// Self-hosted fonts (DESIGN_LANGUAGE §11 / ADR-000020): no third-party request, so no
-	// visitor-IP leak (passive sentinel, principle #1). Weight- and subset-controlled to keep
-	// the CJK payload down; @fontsource ships font-display:swap so first paint never blocks.
+	// visitor-IP leak (passive sentinel, principle #1).
 	// IBM Plex Mono — numbers / IDs / hashes / labels (latin subset, 400/500/600).
 	import '@fontsource/ibm-plex-mono/latin-400.css';
 	import '@fontsource/ibm-plex-mono/latin-500.css';
@@ -11,17 +10,13 @@
 	import '@fontsource/ibm-plex-sans/latin-500.css';
 	import '@fontsource/ibm-plex-sans/latin-600.css';
 	import '@fontsource/ibm-plex-sans/latin-700.css';
-	// IBM Plex Sans JP — Japanese body / UI (japanese subset, 400/500/600/700).
-	import '@fontsource/ibm-plex-sans-jp/japanese-400.css';
-	import '@fontsource/ibm-plex-sans-jp/japanese-500.css';
-	import '@fontsource/ibm-plex-sans-jp/japanese-600.css';
-	import '@fontsource/ibm-plex-sans-jp/japanese-700.css';
-	// Zen Old Mincho — editorial titles ONLY: Display / page H1 / record titles (600/700,
-	// japanese + latin subsets). System mincho is the fallback until this loads (--font-serif).
-	import '@fontsource/zen-old-mincho/japanese-600.css';
-	import '@fontsource/zen-old-mincho/japanese-700.css';
-	import '@fontsource/zen-old-mincho/latin-600.css';
-	import '@fontsource/zen-old-mincho/latin-700.css';
+	// Japanese faces — IBM Plex Sans JP 400/600 (body/UI) + Zen Old Mincho 700 (record
+	// titles, §4.1) — are self-hosted and unicode-range-SLICED (scripts/subset-fonts.mjs,
+	// regenerate via `pnpm fonts:build`). The browser fetches only the slices whose glyphs
+	// appear on the page (Google-Noto technique), so the homepage no longer pulls ~3.7 MB of
+	// un-sliced CJK woff2 up front — the cause of the LCP=悪い regression. woff2 is already
+	// Brotli, so cutting glyph count (not gzip) is the only lever that moves the bytes.
+	import '$lib/fonts/jp.css';
 
 	import '$lib/styles/tokens.css';
 	import favicon from '$lib/assets/favicon.png';
