@@ -3,6 +3,8 @@
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
 	import LawChangeBlock from '$lib/components/LawChangeBlock.svelte';
 	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
+	import DocOutline, { type OutlineItem } from '$lib/components/DocOutline.svelte';
+	import BackToTop from '$lib/components/BackToTop.svelte';
 	import { safeSourceUrl } from '$lib/safeSourceUrl';
 
 	let { data }: { data: PageData } = $props();
@@ -28,10 +30,31 @@
 	};
 	const sortedNodes = $derived([...data.nodes].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0)));
 	const repealed = $derived(law.repealStatus && law.repealStatus !== 'None');
+
+	// Stable in-page anchor for an article, keyed off its eId (the version-spanning
+	// identifier, CONTEXT「eId」). The visible label stays readable (第N条); the fragment
+	// is an internal navigation handle, not a primary label (ADR-000021/000014).
+	const anchorId = (n: { eid?: string; ordinal?: number }) =>
+		'n-' + (n.eid ?? `ord-${n.ordinal ?? 0}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+	const articleNodes = $derived(sortedNodes.filter((n) => n.nodeType === 'article'));
+	// Two-level reading outline: the page sections, then each 条. 項/号 are not indexed
+	// (hundreds of nodes); the article is the unit laws are cited by.
+	const outlineItems = $derived<OutlineItem[]>([
+		{ id: 'sec-changes', label: '変更履歴', level: 0 },
+		{ id: 'sec-current', label: '現行全文', level: 0 },
+		...articleNodes.map((n) => ({
+			id: anchorId(n),
+			label: (n.isSuppl ? '附則 ' : '') + '第' + (n.num ?? '') + '条',
+			sub: n.caption,
+			level: 1
+		}))
+	]);
 </script>
 
 <svelte:head><title>{law.lawTitle ?? law.lawId} — S4RCIV</title></svelte:head>
 
+<div class="doc-shell">
+<DocOutline items={outlineItems} count={articleNodes.length} />
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>
 
@@ -46,7 +69,7 @@
 		<ProvenanceChip attr={law.attribution} {verifyHref} />
 	</header>
 
-	<section aria-label="変更履歴">
+	<section id="sec-changes" aria-label="変更履歴">
 		<h2 class="label">変更履歴</h2>
 		{#if data.changes.length === 0}
 			<p class="empty">記録された変更はまだありません（初回観測のみ）。法令を2回以上観測すると、構造差分がここに条文の文脈付きで表示されます。</p>
@@ -57,11 +80,16 @@
 		{/if}
 	</section>
 
-	<section aria-label="現行全文">
+	<section id="sec-current" aria-label="現行全文">
 		<h2 class="label">現行全文 <span class="cnt mono">{sortedNodes.length} ノード</span></h2>
 		<div class="tree">
 			{#each sortedNodes as n (n.eid)}
-				<div class="node" style="--lv: {indent(n)}" class:suppl={n.isSuppl}>
+				<div
+					class="node"
+					id={n.nodeType === 'article' ? anchorId(n) : undefined}
+					style="--lv: {indent(n)}"
+					class:suppl={n.isSuppl}
+				>
 					{#if n.num || n.caption}
 						<span class="num mono"
 							>{n.nodeType === 'article' ? '第' + n.num + '条' : n.num ?? ''}</span
@@ -84,8 +112,33 @@
 		<VerificationPanel data={data.verification} />
 	{/if}
 </main>
+</div>
+
+<BackToTop />
 
 <style>
+	/* Desktop ≥1200px: a left-gutter outline column flanks the centred reading column,
+	   which keeps its exact position and width. Below that the outline hides itself and
+	   .wrap is the sole, centred column (unchanged from before). */
+	.doc-shell {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+	}
+	@media (min-width: 75rem) {
+		.doc-shell {
+			grid-template-columns: 1fr minmax(0, 880px) 1fr;
+			align-items: start;
+			column-gap: var(--s4);
+		}
+		.doc-shell > :global(.outline) {
+			grid-column: 1;
+			justify-self: end;
+			margin-top: 24px;
+		}
+		.doc-shell > .wrap {
+			grid-column: 2;
+		}
+	}
 	.wrap {
 		max-width: 880px;
 		margin: 0 auto;

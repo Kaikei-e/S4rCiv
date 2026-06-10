@@ -2,10 +2,26 @@
 	import type { PageData } from './$types';
 	import ProvenanceChip from '$lib/components/ProvenanceChip.svelte';
 	import VerificationPanel from '$lib/components/VerificationPanel.svelte';
+	import DocOutline, { type OutlineItem } from '$lib/components/DocOutline.svelte';
+	import BackToTop from '$lib/components/BackToTop.svelte';
 	import { safeSourceUrl } from '$lib/safeSourceUrl';
 
 	let { data }: { data: PageData } = $props();
 	const m = $derived(data.meeting);
+
+	// Anchor each speech by its 発言順 (stable within a meeting). The outline is the
+	// 発言順インデックス (会議軸, ADR-000004): a flat ordered list labelled by speaker.
+	// It is NOT a per-person anthology — the same name may recur and is never grouped or
+	// deduplicated into a "this person's remarks" axis.
+	const speechAnchor = (order: number | undefined, i: number) => `sp-${order ?? i}`;
+	const outlineItems = $derived<OutlineItem[]>(
+		data.speeches.map((s, i) => ({
+			id: speechAnchor(s.speechOrder, i),
+			label: s.speaker || '—',
+			sub: s.speakerGroup,
+			level: 0
+		}))
+	);
 	const subtitle = $derived(
 		[m.session ? `第${m.session}回` : '', m.house ?? '', m.issue ?? '', m.date ?? '']
 			.filter(Boolean)
@@ -24,6 +40,8 @@
 
 <svelte:head><title>{m.meetingName ?? m.issueId} — S4RCIV</title></svelte:head>
 
+<div class="doc-shell">
+<DocOutline items={outlineItems} count={data.speeches.length} />
 <main id="main" class="wrap">
 	<a class="back" href="/">← タイムライン</a>
 
@@ -39,8 +57,8 @@
 	     their named-vote record (the only allowed per-person axis, ADR-000006). -->
 	<section aria-label="発言" class="speeches">
 		<h2 class="label">発言 <span class="cnt mono">{data.speeches.length}</span></h2>
-		{#each data.speeches as s (s.speechId)}
-			<article class="sp">
+		{#each data.speeches as s, i (s.speechId)}
+			<article class="sp" id={speechAnchor(s.speechOrder, i)}>
 				<div class="who">
 					{#if s.personId}
 						<a class="speaker" href="/legislators/{s.personId}" title="記名投票の記録を見る"
@@ -69,8 +87,33 @@
 		<VerificationPanel data={data.verification} />
 	{/if}
 </main>
+</div>
+
+<BackToTop />
 
 <style>
+	/* Desktop ≥1200px: a left-gutter 発言順インデックス flanks the centred reading column,
+	   which keeps its exact position and width. Below that the outline hides itself and
+	   .wrap is the sole, centred column (unchanged from before). */
+	.doc-shell {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+	}
+	@media (min-width: 75rem) {
+		.doc-shell {
+			grid-template-columns: 1fr minmax(0, 820px) 1fr;
+			align-items: start;
+			column-gap: var(--s4);
+		}
+		.doc-shell > :global(.outline) {
+			grid-column: 1;
+			justify-self: end;
+			margin-top: 24px;
+		}
+		.doc-shell > .wrap {
+			grid-column: 2;
+		}
+	}
 	.wrap {
 		max-width: 820px;
 		margin: 0 auto;
