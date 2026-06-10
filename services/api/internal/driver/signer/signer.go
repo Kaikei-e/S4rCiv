@@ -32,10 +32,21 @@ func (s Signer) SignCheckpoint(c obs.Checkpoint) ([]byte, string, error) {
 }
 
 // Load reads the note signing key from the mounted secret file and returns a Signer.
+// The file must not be group/other accessible (0600 or 0400): a private signing key
+// readable by other accounts would let them forge checkpoints.
 func Load() (Signer, error) {
 	path := os.Getenv(KeyFileEnv)
 	if path == "" {
 		return Signer{}, fmt.Errorf("%s is not set", KeyFileEnv)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return Signer{}, fmt.Errorf("stat signing key secret: %w", err)
+	}
+	if mode := fi.Mode().Perm(); mode&0o077 != 0 {
+		return Signer{}, fmt.Errorf(
+			"signing key secret %s has mode %04o (group/other access); run `chmod 600 %s` so only the owner can read it",
+			path, mode, path)
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {

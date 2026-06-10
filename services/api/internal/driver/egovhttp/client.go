@@ -20,10 +20,14 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/temoto/robotstxt"
 )
+
+// maxRedirects caps redirect chains; every hop is re-validated by checkRedirect.
+const maxRedirects = 10
 
 // Client serializes and spaces requests to one source. Construct one per source.
 type Client struct {
@@ -40,8 +44,11 @@ type Client struct {
 }
 
 // robotsResult memoizes one host's robots.txt group (or the error fetching it).
+// done is set after the once completes so redirect hops can read the cached group
+// race-free without going through (and possibly blocking on) the once.
 type robotsResult struct {
 	once  sync.Once
+	done  atomic.Bool
 	group *robotstxt.Group
 	err   error
 }
@@ -60,13 +67,56 @@ func New(baseURL, userAgent string, interval time.Duration, allowedHosts ...stri
 			allowed[strings.ToLower(h)] = struct{}{}
 		}
 	}
-	return &Client{
+	c := &Client{
 		base:     u,
 		ua:       userAgent,
 		interval: interval,
-		http:     &http.Client{Timeout: 30 * time.Second},
 		allowed:  allowed,
-	}, nil
+	}
+	c.http = &http.Client{Timeout: 30 * time.Second, CheckRedirect: c.checkRedirect}
+	return c, nil
+}
+
+// checkRedirect re-applies the GetAbs validation to every redirect hop, so a
+// redirecting upstream cannot steer the collector off the allowlist (SSRF,
+// CWE-918): only http(s), no userinfo, and an allowlisted host. When the hop
+// host's robots.txt is already cached the hop path is re-tested against it;
+// fetching it here would bypass the serial interval gate, so an uncached (but
+// allowlisted) host is covered by the host allowlist alone.
+func (c *Client) checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxRedirects)
+	}
+	u := req.URL
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("refusing redirect to non-http(s) scheme %q", u.Scheme)
+	}
+	if u.User != nil {
+		return fmt.Errorf("refusing redirect with userinfo: %q", u.Redacted())
+	}
+	host := strings.ToLower(u.Hostname())
+	if _, ok := c.allowed[host]; !ok {
+		return fmt.Errorf("refusing redirect to off-allowlist host %q (SSRF guard)", host)
+	}
+	if g := c.cachedRobots(u.Host); g != nil && !g.Test(u.Path) {
+		return fmt.Errorf("robots.txt disallows redirect target %q on %q", u.Path, host)
+	}
+	return nil
+}
+
+// cachedRobots returns the host's robots group when (and only when) its fetch has
+// already completed; nil otherwise. Never fetches. Keyed like checkRobots (the
+// URL's Host, which may carry a port).
+func (c *Client) cachedRobots(host string) *robotstxt.Group {
+	v, ok := c.robots.Load(strings.ToLower(host))
+	if !ok {
+		return nil
+	}
+	r := v.(*robotsResult)
+	if !r.done.Load() {
+		return nil
+	}
+	return r.group
 }
 
 // Get fetches base + "/" + endpoint with the given query, spacing requests by the
@@ -107,6 +157,13 @@ func (c *Client) fetch(ctx context.Context, rawURL, scheme, host, path string) (
 	if err := c.checkRobots(ctx, scheme, host, path); err != nil {
 		return nil, 0, err
 	}
+	return c.gatedDo(ctx, rawURL)
+}
+
+// gatedDo serializes the request behind the per-source mutex and waits out the
+// interval since the previous request. Every outbound request — including the
+// robots.txt fetches — goes through here, so first contact never bursts.
+func (c *Client) gatedDo(ctx context.Context, rawURL string) ([]byte, int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if wait := time.Until(c.next); wait > 0 {
@@ -142,13 +199,16 @@ func (c *Client) do(ctx context.Context, rawURL string) ([]byte, int, error) {
 
 // checkRobots lazily fetches and caches robots.txt for the TARGET host (not the
 // base host) and rejects a disallowed path. A missing robots.txt is "allow all".
+// The fetch consumes an interval slot (gatedDo) like any other request, so first
+// contact with a host does not send two back-to-back requests.
 func (c *Client) checkRobots(ctx context.Context, scheme, host, path string) error {
-	v, _ := c.robots.LoadOrStore(host, &robotsResult{})
+	v, _ := c.robots.LoadOrStore(strings.ToLower(host), &robotsResult{})
 	r := v.(*robotsResult)
 	r.once.Do(func() {
-		body, status, err := c.do(ctx, scheme+"://"+host+"/robots.txt")
+		defer r.done.Store(true)
+		body, status, err := c.gatedDo(ctx, scheme+"://"+host+"/robots.txt")
 		if err != nil {
-			r.err = fmt.Errorf("fetch robots.txt for %s: %w", host, err)
+			r.err = fmt.Errorf("fetch robots.txt for %q: %w", host, err)
 			return
 		}
 		if status == http.StatusNotFound {
@@ -156,7 +216,7 @@ func (c *Client) checkRobots(ctx context.Context, scheme, host, path string) err
 		}
 		data, err := robotstxt.FromBytes(body)
 		if err != nil {
-			r.err = fmt.Errorf("parse robots.txt for %s: %w", host, err)
+			r.err = fmt.Errorf("parse robots.txt for %q: %w", host, err)
 			return
 		}
 		r.group = data.FindGroup(c.ua)
@@ -165,7 +225,7 @@ func (c *Client) checkRobots(ctx context.Context, scheme, host, path string) err
 		return r.err
 	}
 	if r.group != nil && !r.group.Test(path) {
-		return fmt.Errorf("robots.txt disallows %s on %s", path, host)
+		return fmt.Errorf("robots.txt disallows %q on %q", path, host)
 	}
 	return nil
 }

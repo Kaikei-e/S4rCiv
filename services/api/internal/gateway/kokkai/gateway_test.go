@@ -2,9 +2,12 @@ package kokkai
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"s4rciv.org/api/internal/blob"
@@ -122,5 +125,65 @@ func TestListMeetings(t *testing.T) {
 	}
 	if refs[0].StreamID != "kokkai:121815254X00120240115" {
 		t.Fatalf("ref[0].StreamID = %s", refs[0].StreamID)
+	}
+}
+
+// pagerGetter computes each meeting_list page from the startRecord query param,
+// simulating an upstream whose cursor we do not control.
+type pagerGetter struct {
+	page func(start int) []byte
+}
+
+func (p pagerGetter) Get(_ context.Context, _ string, q url.Values) ([]byte, int, error) {
+	start, _ := strconv.Atoi(q.Get("startRecord"))
+	return p.page(start), 200, nil
+}
+
+func listPage(start, next, records int) []byte {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf(`{"numberOfRecords":%d,"nextRecordPosition":%d,"meetingRecord":[`, records, next))
+	for i := 0; i < records; i++ {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(fmt.Sprintf(`{"issueID":"ISSUE%08d","meetingURL":"https://example.test/m"}`, start+i))
+	}
+	sb.WriteString("]}")
+	return []byte(sb.String())
+}
+
+// An upstream that returns a non-advancing nextRecordPosition must abort the
+// traversal with an error instead of looping forever on a trusted cursor.
+func TestListMeetingsAbortsOnNonAdvancingCursor(t *testing.T) {
+	g := New(pagerGetter{page: func(start int) []byte {
+		return listPage(start, start, 1) // cursor never advances
+	}})
+	_, err := g.ListMeetings(context.Background(), port.ListScope{From: "2024-01-15", Until: "2024-01-16"})
+	if err == nil || !strings.Contains(err.Error(), "non-advancing") {
+		t.Fatalf("non-advancing cursor must abort with an error, got %v", err)
+	}
+}
+
+// Even an always-advancing cursor is bounded by the page ceiling, so a runaway
+// upstream listing cannot drive an unbounded crawl.
+func TestListMeetingsAbortsAfterPageCeiling(t *testing.T) {
+	g := New(pagerGetter{page: func(start int) []byte {
+		return listPage(start, start+1, 1) // advances forever
+	}})
+	_, err := g.ListMeetings(context.Background(), port.ListScope{From: "2024-01-15", Until: "2024-01-16"})
+	if err == nil || !strings.Contains(err.Error(), "pages") {
+		t.Fatalf("runaway pagination must abort at the page ceiling, got %v", err)
+	}
+}
+
+// An upstream that overstuffs a single page is bounded by the total-refs ceiling
+// independently of scope.Max.
+func TestListMeetingsAbortsAfterRefsCeiling(t *testing.T) {
+	g := New(pagerGetter{page: func(start int) []byte {
+		return listPage(start, 0, maxListRefs+1) // one giant "terminal" page
+	}})
+	_, err := g.ListMeetings(context.Background(), port.ListScope{From: "2024-01-15", Until: "2024-01-16"})
+	if err == nil || !strings.Contains(err.Error(), "refs") {
+		t.Fatalf("oversized page must abort at the refs ceiling, got %v", err)
 	}
 }

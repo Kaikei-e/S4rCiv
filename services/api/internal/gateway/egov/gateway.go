@@ -34,6 +34,14 @@ const mediaTypeXML = "application/xml"
 // updateListV1Base is the v1 fallback for the updated-law list when v2 returns 404.
 const updateListV1Base = "https://laws.e-gov.go.jp/api/1"
 
+// maxListPages and maxListRefs bound one ListLaws traversal regardless of what the
+// upstream cursor claims, so a looping or runaway next_offset can never drive an
+// unbounded crawl. A wider backfill must use --law-type slices or multiple calls.
+const (
+	maxListPages = 200
+	maxListRefs  = 20000
+)
+
 // httpGetter is the read-only HTTP-GET boundary (driver/egovhttp.Client). The
 // absURL form lets the gateway reach the v1 updatelawlists endpoint when v2 404s.
 type httpGetter interface {
@@ -122,7 +130,7 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 func (g *Gateway) absenceOrPending(ctx context.Context, lawID string) (port.FetchResult, error) {
 	exists, err := g.lawExists(ctx, lawID)
 	if err != nil {
-		return port.FetchResult{}, fmt.Errorf("confirm law existence %s: %w", lawID, err)
+		return port.FetchResult{}, fmt.Errorf("confirm law existence %q: %w", lawID, err)
 	}
 	if exists {
 		return port.FetchResult{ContentUnavailable: true}, nil
@@ -163,12 +171,18 @@ func (g *Gateway) ParseLaw(content []byte) (leg.LawContent, error) {
 }
 
 // ListLaws traverses /laws, paging via next_offset, returning stream refs to add
-// to the watch list. lawType "" lists all law types.
+// to the watch list. lawType "" lists all law types. The cursor is upstream-
+// controlled, so the traversal is bounded: next_offset must advance monotonically
+// (0 means end of listing) and the page/ref ceilings cap the crawl independently
+// of scope.Max.
 func (g *Gateway) ListLaws(ctx context.Context, scope port.ListScope, lawType string) ([]port.LawRef, error) {
 	var refs []port.LawRef
 	offset := 0
 	const pageSize = 100
-	for {
+	for page := 0; ; page++ {
+		if page >= maxListPages {
+			return nil, fmt.Errorf("egov laws: exceeded %d pages without finishing; narrow the listing", maxListPages)
+		}
 		q := url.Values{}
 		q.Set("response_format", "json")
 		q.Set("limit", strconv.Itoa(pageSize))
@@ -202,9 +216,17 @@ func (g *Gateway) ListLaws(ctx context.Context, scope port.ListScope, lawType st
 			if scope.Max > 0 && len(refs) >= scope.Max {
 				return refs, nil
 			}
+			if len(refs) >= maxListRefs {
+				return nil, fmt.Errorf("egov laws: exceeded %d refs; narrow the listing", maxListRefs)
+			}
 		}
+		if resp.NextOffset <= 0 {
+			return refs, nil // 0 (JSON null/absent) marks the terminal page
+		}
+		// Monotonicity guard: a positive but non-advancing cursor would loop
+		// forever, so it is an upstream protocol error, not a signal to keep trusting.
 		if resp.NextOffset <= offset {
-			return refs, nil
+			return nil, fmt.Errorf("egov laws: non-advancing next_offset %d at offset %d", resp.NextOffset, offset)
 		}
 		offset = resp.NextOffset
 	}

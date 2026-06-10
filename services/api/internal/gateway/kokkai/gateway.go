@@ -23,6 +23,15 @@ import (
 // SourceName is the adapter/source identifier and stream_id prefix.
 const SourceName = "kokkai"
 
+// maxListPages and maxListRefs bound one ListMeetings traversal regardless of
+// what the upstream cursor claims, so a looping or runaway nextRecordPosition
+// can never drive an unbounded crawl. A wider backfill must use narrower date
+// windows across multiple discover calls.
+const (
+	maxListPages = 200
+	maxListRefs  = 20000
+)
+
 // httpGetter is the read-only HTTP-GET boundary (driver/kokkaihttp.Client).
 type httpGetter interface {
 	Get(ctx context.Context, endpoint string, q url.Values) ([]byte, int, error)
@@ -131,11 +140,16 @@ func (g *Gateway) toContent(mr meetingRecord) leg.MeetingContent {
 }
 
 // ListMeetings traverses meeting_list over the scope's date range, paging via
-// nextRecordPosition, returning stream refs to add to the watch list.
+// nextRecordPosition, returning stream refs to add to the watch list. The cursor
+// is upstream-controlled, so the traversal is bounded: the cursor must advance
+// monotonically and the page/ref ceilings cap the crawl independently of scope.Max.
 func (g *Gateway) ListMeetings(ctx context.Context, scope port.ListScope) ([]port.MeetingRef, error) {
 	var refs []port.MeetingRef
 	start := 1
-	for {
+	for page := 0; ; page++ {
+		if page >= maxListPages {
+			return nil, fmt.Errorf("kokkai meeting_list: exceeded %d pages without finishing; narrow the date window", maxListPages)
+		}
 		q := url.Values{}
 		q.Set("recordPacking", "json")
 		q.Set("maximumRecords", "100")
@@ -174,9 +188,17 @@ func (g *Gateway) ListMeetings(ctx context.Context, scope port.ListScope) ([]por
 			if scope.Max > 0 && len(refs) >= scope.Max {
 				return refs, nil
 			}
+			if len(refs) >= maxListRefs {
+				return nil, fmt.Errorf("kokkai meeting_list: exceeded %d refs; narrow the date window", maxListRefs)
+			}
 		}
 		if resp.NextRecordPosition <= 0 {
 			return refs, nil
+		}
+		// Monotonicity guard: a non-advancing cursor would loop forever, so it is
+		// an upstream protocol error, not a signal to keep trusting.
+		if resp.NextRecordPosition <= start {
+			return nil, fmt.Errorf("kokkai meeting_list: non-advancing nextRecordPosition %d at startRecord %d", resp.NextRecordPosition, start)
 		}
 		start = resp.NextRecordPosition
 	}

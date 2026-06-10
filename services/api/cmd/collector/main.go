@@ -60,6 +60,11 @@ const (
 	// published records and absorb a multi-week daemon outage; upsert is idempotent so
 	// re-scanning is cheap and safe (ADR-000012). Long gaps still need a manual catch-up.
 	discoverWindowDays = 90
+	// autoDiscoverMax caps how many refs one auto-discover cycle may collect, so a
+	// misbehaving upstream listing cannot balloon the watch list unattended. The
+	// 90-day window holds well under this in practice; a deliberate backfill beyond
+	// it goes through the manual discover command.
+	autoDiscoverMax = 2000
 )
 
 // recentScope is the rolling discover window [today-discoverWindowDays, today],
@@ -68,6 +73,7 @@ func recentScope(now time.Time) port.ListScope {
 	return port.ListScope{
 		From:  now.AddDate(0, 0, -discoverWindowDays).Format("2006-01-02"),
 		Until: now.Format("2006-01-02"),
+		Max:   autoDiscoverMax,
 	}
 }
 
@@ -128,9 +134,17 @@ func main() {
 		return
 	}
 
-	p, err := wire(ctx, pool, *source)
+	p, cfg, err := wire(ctx, pool, *source)
 	if err != nil {
 		log.Fatalf("wire %s: %v", *source, err)
+	}
+
+	// control.source.enabled is the operator's kill switch for one source: a
+	// disabled source must not be polled or discovered. reproject stays available —
+	// it only replays already-recorded events and never touches the source.
+	if !cfg.Enabled && commandNeedsEnabledSource(rest[0]) {
+		log.Printf("source %s is disabled in control.source; refusing %q (set enabled=true to resume)", *source, rest[0])
+		return
 	}
 
 	switch rest[0] {
@@ -151,11 +165,22 @@ func main() {
 	}
 }
 
-func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, error) {
+// commandNeedsEnabledSource reports whether the subcommand contacts the source
+// (run/poll/discover) and therefore must be refused when control.source.enabled
+// is false. reproject only replays recorded observation events, so it is exempt.
+func commandNeedsEnabledSource(cmd string) bool {
+	switch cmd {
+	case "run", "poll-once", "discover":
+		return true
+	}
+	return false
+}
+
+func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, port.SourceConfig, error) {
 	control := postgres.NewControlStore(pool)
 	cfg, err := control.Source(ctx, source)
 	if err != nil {
-		return nil, fmt.Errorf("load source %q: %w", source, err)
+		return nil, cfg, fmt.Errorf("load source %q: %w", source, err)
 	}
 	ua := envOr("USER_AGENT", cfg.UserAgent)
 
@@ -163,7 +188,7 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 	case kokkai.SourceName:
 		httpc, err := kokkaihttp.New(cfg.BaseURL, ua, cfg.RateLimit)
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		gw := kokkai.New(httpc)
 		collector := collect.New(
@@ -172,7 +197,7 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		)
 		rm := postgres.NewReadModel(pool)
 		projector := project.New(postgres.NewEventReader(pool), gw, rm, rm, source)
-		return &kokkaiPipeline{collector: collector, projector: projector}, nil
+		return &kokkaiPipeline{collector: collector, projector: projector}, cfg, nil
 
 	case giinroster.SourceName:
 		// egovhttp is a generic rate-limited + robots-compliant GET client (GetAbs);
@@ -181,7 +206,7 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		// 参 host is added to the GetAbs allowlist (SSRF guard; F-005).
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit, "www.sangiin.go.jp")
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		gw := giinroster.New(httpc)
 		collector := collect.New(
@@ -190,12 +215,12 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		)
 		rm := postgres.NewRosterReadModel(pool, giinroster.StreamID(""))
 		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, giinroster.SourceName, giinroster.StreamID(""))
-		return &giinRosterPipeline{collector: collector, projector: projector}, nil
+		return &giinRosterPipeline{collector: collector, projector: projector}, cfg, nil
 
 	case sangiin.SourceName: // 参議院本会議投票結果 (touhyoulist) — per-member roll-calls (ADR-000010)
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		gw := sangiin.New(httpc)
 		collector := collect.New(
@@ -204,12 +229,12 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		)
 		rm := postgres.NewSangiinVoteReadModel(pool)
 		projector := project.NewSangiinVote(postgres.NewEventReader(pool), gw, rm, rm, sangiin.SourceName)
-		return &sangiinVotePipeline{collector: collector, projector: projector, gw: gw, control: control}, nil
+		return &sangiinVotePipeline{collector: collector, projector: projector, gw: gw, control: control}, cfg, nil
 
 	case sangiin.RosterSourceName: // 参議院議員名簿 → legislator_district (house=参議院)
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		gw := sangiin.New(httpc)
 		collector := collect.New(
@@ -218,12 +243,12 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		)
 		rm := postgres.NewRosterReadModel(pool, sangiin.RosterStreamID(""))
 		projector := project.NewRoster(postgres.NewEventReader(pool), gw, rm, rm, sangiin.RosterSourceName, sangiin.RosterStreamID(""))
-		return &sangiinRosterPipeline{collector: collector, projector: projector, gw: gw, control: control}, nil
+		return &sangiinRosterPipeline{collector: collector, projector: projector, gw: gw, control: control}, cfg, nil
 
 	case egov.SourceName:
 		httpc, err := egovhttp.New(cfg.BaseURL, ua, cfg.RateLimit)
 		if err != nil {
-			return nil, err
+			return nil, cfg, err
 		}
 		gw := egov.New(httpc)
 		collector := collect.NewEgov(
@@ -235,10 +260,10 @@ func wire(ctx context.Context, pool *pgxpool.Pool, source string) (pipeline, err
 		projector := project.NewLaw(reader, gw, lawRM, lawRM, source)
 		changeRM := postgres.NewChangeReadModel(pool)
 		differ := diff.New(reader, diffrpc.New(envOr("DIFFER_URL", "http://differ:9090")), changeRM, changeRM, "egov-differ")
-		return &egovPipeline{collector: collector, projector: projector, differ: differ}, nil
+		return &egovPipeline{collector: collector, projector: projector, differ: differ}, cfg, nil
 
 	default:
-		return nil, fmt.Errorf("unknown source %q", source)
+		return nil, cfg, fmt.Errorf("unknown source %q", source)
 	}
 }
 
@@ -415,7 +440,7 @@ func (p *sangiinVotePipeline) discover(ctx context.Context, _ []string) {
 			StreamID: r.StreamID, Source: sangiin.SourceName,
 			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
 		}); err != nil {
-			log.Fatalf("upsert watch %s: %v", r.StreamID, err)
+			log.Fatalf("upsert watch %q: %v", r.StreamID, err)
 		}
 	}
 	log.Printf("discover: upserted %d watches", len(refs))
@@ -433,7 +458,7 @@ func (p *sangiinVotePipeline) autoDiscover(ctx context.Context) {
 			StreamID: r.StreamID, Source: sangiin.SourceName,
 			SourceLocalKey: r.SourceLocalKey, CanonicalURL: r.CanonicalURL,
 		}); err != nil {
-			logDiscover(sangiin.SourceName, 0, fmt.Errorf("upsert %s: %w", r.StreamID, err))
+			logDiscover(sangiin.SourceName, 0, fmt.Errorf("upsert %q: %w", r.StreamID, err))
 			return
 		}
 	}
@@ -490,7 +515,7 @@ func (p *sangiinRosterPipeline) discover(ctx context.Context, _ []string) {
 	}); err != nil {
 		log.Fatalf("upsert watch: %v", err)
 	}
-	log.Printf("discover: upserted 1 watch (%s)", ref.CanonicalURL)
+	log.Printf("discover: upserted 1 watch (%q)", ref.CanonicalURL)
 }
 
 func (p *sangiinRosterPipeline) autoDiscover(ctx context.Context) {
@@ -683,8 +708,12 @@ func runCheckpoint(ctx context.Context, pool *pgxpool.Pool, args []string) {
 		if err != nil {
 			log.Fatalf("checkpoint genkey: %v", err)
 		}
-		fmt.Printf("# private signing key — store as the %s secret, never commit\n%s\n", signer.KeyFileEnv, skey)
-		fmt.Printf("# public verifier key — publish so third parties can verify\n%s\n", vkey)
+		// Only the private key goes to stdout, so it can be redirected straight into
+		// the secret file (`... genkey > checkpoint.key && chmod 600 checkpoint.key`)
+		// without ever crossing a terminal scrollback; everything else goes to stderr.
+		fmt.Fprintf(os.Stderr, "# private signing key on stdout — redirect it into the %s secret file (chmod 600), never commit or paste it\n", signer.KeyFileEnv)
+		fmt.Println(skey)
+		fmt.Fprintf(os.Stderr, "# public verifier key — publish so third parties can verify\n%s\n", vkey)
 		return
 	}
 
@@ -714,7 +743,9 @@ func usage() {
               egov-law also: [--law-type T] [--updated]
   checkpoint  sign the current log-chain head (idempotent; run periodically)
   checkpoint genkey [name]
-              print a fresh Ed25519 keypair (skey secret + vkey to publish)
+              print a fresh Ed25519 keypair: the private skey goes to stdout
+              (redirect it straight into the secret file, then chmod 600);
+              the public vkey to publish goes to stderr
 `)
 }
 

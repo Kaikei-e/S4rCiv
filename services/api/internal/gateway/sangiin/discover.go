@@ -79,7 +79,7 @@ func (g *Gateway) DiscoverVotes(ctx context.Context) ([]port.MeetingRef, error) 
 		return nil, err
 	}
 	if status != 200 {
-		return nil, fmt.Errorf("vote_ind %s: status %d", session, status)
+		return nil, fmt.Errorf("vote_ind %q: status %d", session, status)
 	}
 	seen := map[string]bool{}
 	var refs []port.MeetingRef

@@ -3,6 +3,7 @@ package signer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/mod/sumdb/note"
@@ -14,6 +15,36 @@ func TestLoadErrorsWhenEnvUnset(t *testing.T) {
 	t.Setenv(KeyFileEnv, "")
 	if _, err := Load(); err == nil {
 		t.Fatal("Load must error when the key-file env is unset")
+	}
+}
+
+// A signing key readable by group/other would let other accounts forge
+// checkpoints, so Load must refuse it and tell the operator to chmod 600.
+func TestLoadRejectsGroupOtherReadableKey(t *testing.T) {
+	skey, _, err := Generate("s4rciv-checkpoint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "checkpoint.key")
+	if err := os.WriteFile(path, []byte(skey+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(KeyFileEnv, path)
+
+	_, err = Load()
+	if err == nil {
+		t.Fatal("Load must reject a group/other-readable key file")
+	}
+	if !strings.Contains(err.Error(), "chmod 600") {
+		t.Fatalf("error must tell the operator to chmod 600, got %v", err)
+	}
+
+	// 0400 (read-only owner) is as legitimate as 0600.
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load must accept a 0400 key file: %v", err)
 	}
 }
 

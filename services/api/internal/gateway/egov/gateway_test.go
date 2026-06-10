@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -199,8 +201,8 @@ func TestFetchErrorsWhenExistenceUnconfirmed(t *testing.T) {
 
 func TestListLawsPaging(t *testing.T) {
 	// A static fakeGetter returns the same body for every "laws" call; the gateway
-	// terminates when next_offset does not advance past the current offset, so a
-	// terminal page sets next_offset to 0 (= the starting offset) and returns once.
+	// terminates when next_offset is 0 (JSON null/absent on the terminal page), so
+	// this single page is listed once and the traversal returns.
 	page0, _ := json.Marshal(map[string]any{
 		"total_count": 1, "count": 1, "next_offset": 0,
 		"laws": []any{map[string]any{"law_info": map[string]any{"law_id": "A1"}}},
@@ -215,6 +217,57 @@ func TestListLawsPaging(t *testing.T) {
 	}
 	if refs[0].CanonicalURL != "https://laws.e-gov.go.jp/law/A1" {
 		t.Fatalf("canonical_url = %q", refs[0].CanonicalURL)
+	}
+}
+
+// pagerGetter computes each /laws page from the offset query param, simulating an
+// upstream whose cursor we do not control.
+type pagerGetter struct {
+	page func(offset int) []byte
+}
+
+func (p pagerGetter) Get(_ context.Context, _ string, q url.Values) ([]byte, int, error) {
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	return p.page(offset), 200, nil
+}
+
+func (p pagerGetter) GetAbs(context.Context, string) ([]byte, int, error) {
+	return nil, 404, nil
+}
+
+func lawsPage(t *testing.T, offset, next int) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"total_count": 1, "count": 1, "next_offset": next,
+		"laws": []any{map[string]any{"law_info": map[string]any{"law_id": fmt.Sprintf("L%08d", offset)}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// An upstream that returns a positive but non-advancing next_offset must abort
+// the traversal with an error instead of looping forever on a trusted cursor.
+func TestListLawsAbortsOnNonAdvancingCursor(t *testing.T) {
+	g := New(pagerGetter{page: func(offset int) []byte {
+		return lawsPage(t, offset, 100) // stuck at 100: advances once, then loops
+	}})
+	_, err := g.ListLaws(context.Background(), port.ListScope{}, "")
+	if err == nil || !strings.Contains(err.Error(), "non-advancing") {
+		t.Fatalf("non-advancing cursor must abort with an error, got %v", err)
+	}
+}
+
+// Even an always-advancing cursor is bounded by the page ceiling, so a runaway
+// upstream listing cannot drive an unbounded crawl.
+func TestListLawsAbortsAfterPageCeiling(t *testing.T) {
+	g := New(pagerGetter{page: func(offset int) []byte {
+		return lawsPage(t, offset, offset+100) // advances forever
+	}})
+	_, err := g.ListLaws(context.Background(), port.ListScope{}, "")
+	if err == nil || !strings.Contains(err.Error(), "pages") {
+		t.Fatalf("runaway pagination must abort at the page ceiling, got %v", err)
 	}
 }
 

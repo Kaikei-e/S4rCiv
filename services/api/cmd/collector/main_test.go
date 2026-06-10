@@ -22,8 +22,22 @@ func TestRecentScopeIsRolling90DayWindow(t *testing.T) {
 	if d := until.Sub(from); d != discoverWindowDays*24*time.Hour {
 		t.Fatalf("window = %v, want %d days", d, discoverWindowDays)
 	}
-	if s.Max != 0 {
-		t.Fatalf("max = %d, want 0 (no cap on auto-discover)", s.Max)
+	if s.Max != autoDiscoverMax {
+		t.Fatalf("max = %d, want %d (auto-discover must be capped)", s.Max, autoDiscoverMax)
+	}
+}
+
+// control.source.enabled is the operator's kill switch: every source-contacting
+// subcommand must be refused for a disabled source, while reproject (a local
+// replay of recorded events) stays available.
+func TestCommandNeedsEnabledSource(t *testing.T) {
+	for _, cmd := range []string{"run", "poll-once", "discover"} {
+		if !commandNeedsEnabledSource(cmd) {
+			t.Errorf("%q must require an enabled source", cmd)
+		}
+	}
+	if commandNeedsEnabledSource("reproject") {
+		t.Error("reproject must stay available for a disabled source (local replay only)")
 	}
 }
 

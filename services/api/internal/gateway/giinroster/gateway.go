@@ -73,7 +73,7 @@ func (g *Gateway) Fetch(ctx context.Context, w port.Watch) (port.FetchResult, er
 		return port.FetchResult{Present: false}, nil
 	}
 	if status != 200 {
-		return port.FetchResult{}, fmt.Errorf("giin-roster %s: status %d", w.CanonicalURL, status)
+		return port.FetchResult{}, fmt.Errorf("giin-roster %q: status %d", w.CanonicalURL, status)
 	}
 
 	utf8Body, err := decodeShiftJIS(body)
