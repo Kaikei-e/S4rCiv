@@ -44,7 +44,12 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       DB_PASSWORD_FILE: /run/secrets/db_password
-    secrets:
+    # !override REPLACES the base list instead of merging it. Without the tag,
+    # Compose unions service `secrets` by source name, so the base `api_db_password`
+    # would survive and the test stack would still demand secrets/api_db_password.txt
+    # (which the hermetic test/CI environment never provisions). The override makes
+    # the comment above true: the E2E api mounts ONLY db_password.
+    secrets: !override
       - db_password
 
   # Go unit + integration test runner. `run --rm` starts only this + its depends_on,
