@@ -15,11 +15,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# compose の .env はシェル構文ではない（クォート無しの括弧等を含む）ので
+# source せず、必要な 2 変数だけ抽出する。
 if [ -f .env ]; then
-  set -a
-  # shellcheck disable=SC1091
-  . ./.env
-  set +a
+  POSTGRES_USER="${POSTGRES_USER:-$(grep -E '^POSTGRES_USER=' .env | head -1 | cut -d= -f2-)}"
+  POSTGRES_DB="${POSTGRES_DB:-$(grep -E '^POSTGRES_DB=' .env | head -1 | cut -d= -f2-)}"
 fi
 
 SECRET_FILE="secrets/api_db_password.txt"
